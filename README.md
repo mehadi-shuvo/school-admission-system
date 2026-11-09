@@ -30,6 +30,18 @@ Set a strong value for `POSTGRES_PASSWORD` in `.env`. The `.env` file is ignored
 
 Set `BACKEND_PORT` in `.env` to use a different host port.
 
+## Create an admission class
+
+Create a class with a non-empty name and a positive seat capacity:
+
+```sh
+curl -i -X POST http://localhost:8080/classes \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Class 6 - Morning Shift","totalSeats":120}'
+```
+
+The API returns `201 Created` with `id`, `name`, and `totalSeats`. Names are trimmed before storage. A duplicate trimmed name returns `409 Conflict`; malformed or invalid input returns `400 Bad Request`.
+
 ## Startup and migration strategy
 
 The `db` service runs PostgreSQL 17 and is checked with `pg_isready`. Once healthy, the one-shot `migrate` service applies the committed EF Core migrations and exits. The API starts only after that service succeeds. This prevents the API replicas from racing to apply migrations and means evaluators do not need the EF CLI.

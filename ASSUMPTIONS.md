@@ -6,3 +6,4 @@
 - The default PostgreSQL password exists only to satisfy the single-command, local-evaluation experience. It is public and must be replaced through `.env` for any shared or non-local environment.
 - The API can expose the additive `/health` endpoint without changing existing assignment API contracts.
 - No frontend Docker integration is included because `frontend/` contains no application, package manifest, or lockfile. Adding one would require inventing UI behavior and package-management choices.
+- The assignment contract does not state that class names are case-insensitive. Class-name uniqueness therefore follows the existing PostgreSQL unique index and is case-sensitive after surrounding whitespace is trimmed.
