@@ -27,6 +27,20 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>
 public sealed class TestClassService : IClassService
 {
     private readonly HashSet<string> _classNames = new(StringComparer.Ordinal);
+    private IReadOnlyList<ClassAvailabilityResponse> _classes =
+        Array.Empty<ClassAvailabilityResponse>();
+
+    public Task<IReadOnlyList<ClassAvailabilityResponse>> GetAllAsync(
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_classes);
+    }
+
+    public void SetClasses(params ClassAvailabilityResponse[] classes)
+    {
+        _classes = classes;
+    }
 
     public Task<ClassResponse> CreateAsync(
         CreateClassRequest request,
@@ -62,6 +76,12 @@ public sealed class TestClassService : IClassService
 
 public sealed class FailingClassService : IClassService
 {
+    public Task<IReadOnlyList<ClassAvailabilityResponse>> GetAllAsync(
+        CancellationToken cancellationToken)
+    {
+        throw new InvalidOperationException("Database connection details must remain private.");
+    }
+
     public Task<ClassResponse> CreateAsync(
         CreateClassRequest request,
         CancellationToken cancellationToken)

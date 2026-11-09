@@ -14,10 +14,48 @@ public sealed class ClassService : IClassService
     private const string ClassNameUniqueConstraint = "ux_admission_classes_name";
 
     private readonly AdmissionDbContext _dbContext;
+    private readonly TimeProvider _timeProvider;
 
-    public ClassService(AdmissionDbContext dbContext)
+    public ClassService(
+        AdmissionDbContext dbContext,
+        TimeProvider timeProvider)
     {
         _dbContext = dbContext;
+        _timeProvider = timeProvider;
+    }
+
+    public async Task<IReadOnlyList<ClassAvailabilityResponse>> GetAllAsync(
+        CancellationToken cancellationToken)
+    {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        var classes = await _dbContext.AdmissionClasses
+            .AsNoTracking()
+            .OrderBy(admissionClass => admissionClass.Name)
+            .ThenBy(admissionClass => admissionClass.Id)
+            .Select(admissionClass => new
+            {
+                admissionClass.Id,
+                admissionClass.Name,
+                admissionClass.TotalSeats,
+                HeldSeats = admissionClass.Holds.Count(hold =>
+                    hold.Status == HoldStatus.Held && hold.ExpiresAt > now),
+                ConfirmedSeats = admissionClass.Holds.Count(hold =>
+                    hold.Status == HoldStatus.Confirmed)
+            })
+            .ToListAsync(cancellationToken);
+
+        return classes
+            .Select(admissionClass => new ClassAvailabilityResponse(
+                PublicId.ForClass(admissionClass.Id),
+                admissionClass.Name,
+                admissionClass.TotalSeats,
+                admissionClass.HeldSeats,
+                admissionClass.ConfirmedSeats,
+                admissionClass.TotalSeats -
+                    admissionClass.HeldSeats -
+                    admissionClass.ConfirmedSeats))
+            .ToList();
     }
 
     public async Task<ClassResponse> CreateAsync(

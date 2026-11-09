@@ -16,6 +16,16 @@ public sealed class ClassesController : ControllerBase
         _classService = classService;
     }
 
+    [HttpGet]
+    [ProducesResponseType<IReadOnlyList<ClassAvailabilityResponse>>(
+        StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<ClassAvailabilityResponse>>>
+        GetAll(CancellationToken cancellationToken)
+    {
+        var response = await _classService.GetAllAsync(cancellationToken);
+        return Ok(response);
+    }
+
     [HttpPost]
     [ProducesResponseType<ClassResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]

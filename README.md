@@ -42,6 +42,14 @@ curl -i -X POST http://localhost:8080/classes \
 
 The API returns `201 Created` with `id`, `name`, and `totalSeats`. Names are trimmed before storage. A duplicate trimmed name returns `409 Conflict`; malformed or invalid input returns `400 Bad Request`.
 
+## List admission classes
+
+```sh
+curl -i http://localhost:8080/classes
+```
+
+The API returns `200 OK` and an array of `id`, `name`, `totalSeats`, `heldSeats`, `confirmedSeats`, and `availableSeats`. HELD reservations count only while their expiry is later than the request's UTC timestamp; CONFIRMED reservations always count as occupied.
+
 ## Startup and migration strategy
 
 The `db` service runs PostgreSQL 17 and is checked with `pg_isready`. Once healthy, the one-shot `migrate` service applies the committed EF Core migrations and exits. The API starts only after that service succeeds. This prevents the API replicas from racing to apply migrations and means evaluators do not need the EF CLI.

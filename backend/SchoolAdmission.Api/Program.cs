@@ -8,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
+builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddDbContext<AdmissionDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("AdmissionDb");
