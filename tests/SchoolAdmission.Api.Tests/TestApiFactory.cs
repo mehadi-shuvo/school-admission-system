@@ -137,6 +137,50 @@ public sealed class TestSeatHoldService : ISeatHoldService
 
     public int ConfirmationTransitions { get; private set; }
 
+    public int CancellationTransitions { get; private set; }
+
+    public Task<CancelHoldResult> CancelAsync(
+        Guid holdId,
+        string studentId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!_holdDetails.TryGetValue(holdId, out var hold))
+        {
+            return Task.FromResult(new CancelHoldResult(CancelHoldOutcome.NotFound));
+        }
+
+        if (hold.StudentId != studentId)
+        {
+            return Task.FromResult(new CancelHoldResult(CancelHoldOutcome.Forbidden));
+        }
+
+        if (hold.Status == HoldStatus.Cancelled)
+        {
+            return Task.FromResult(new CancelHoldResult(CancelHoldOutcome.Cancelled));
+        }
+
+        if (hold.Status == HoldStatus.Held && hold.ExpiresAt <= CurrentUtc)
+        {
+            _holdDetails[holdId] = hold with { Status = HoldStatus.Expired };
+            return Task.FromResult(new CancelHoldResult(CancelHoldOutcome.Conflict));
+        }
+
+        if (hold.Status is HoldStatus.Expired or HoldStatus.Confirmed)
+        {
+            return Task.FromResult(new CancelHoldResult(CancelHoldOutcome.Conflict));
+        }
+
+        _holdDetails[holdId] = hold with
+        {
+            Status = HoldStatus.Cancelled,
+            CancelledAt = CurrentUtc
+        };
+        CancellationTransitions++;
+        return Task.FromResult(new CancelHoldResult(CancelHoldOutcome.Cancelled));
+    }
+
     public Task<ConfirmHoldResult> ConfirmAsync(
         Guid holdId,
         string studentId,
@@ -228,7 +272,8 @@ public sealed class TestSeatHoldService : ISeatHoldService
             classId,
             HoldStatus.Held,
             expiresAt,
-            studentId));
+            studentId,
+            null));
         return Task.FromResult<HoldResponse?>(response);
     }
 
@@ -253,20 +298,30 @@ public sealed class TestSeatHoldService : ISeatHoldService
         Guid classId,
         HoldStatus status,
         DateTime expiresAt,
-        string studentId = "00123456789012345")
+        string studentId = "00123456789012345",
+        DateTime? cancelledAt = null)
     {
         _holdDetails[holdId] = new TestHoldDetails(
             classId,
             status,
             expiresAt,
-            studentId);
+            studentId,
+            cancelledAt);
+    }
+
+    public DateTime? GetCancelledAt(Guid holdId)
+    {
+        return _holdDetails.TryGetValue(holdId, out var hold)
+            ? hold.CancelledAt
+            : null;
     }
 
     private sealed record TestHoldDetails(
         Guid ClassId,
         HoldStatus Status,
         DateTime ExpiresAt,
-        string StudentId);
+        string StudentId,
+        DateTime? CancelledAt);
 
     private static ConfirmHoldResult Confirmed(Guid holdId)
     {

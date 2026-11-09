@@ -134,6 +134,79 @@ public sealed class SeatHoldService : ISeatHoldService
         return Confirmed(holdId);
     }
 
+    public async Task<CancelHoldResult> CancelAsync(
+        Guid holdId,
+        string studentId,
+        CancellationToken cancellationToken)
+    {
+        var classId = await _dbContext.SeatHolds
+            .AsNoTracking()
+            .Where(seatHold => seatHold.Id == holdId)
+            .Select(seatHold => (Guid?)seatHold.ClassId)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (classId is null)
+        {
+            return new CancelHoldResult(CancelHoldOutcome.NotFound);
+        }
+
+        await using var transaction = await _dbContext.Database
+            .BeginTransactionAsync(cancellationToken);
+
+        var admissionClass = await _dbContext.AdmissionClasses
+            .FromSqlInterpolated(
+                $"SELECT * FROM admission_classes WHERE id = {classId.Value} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (admissionClass is null)
+        {
+            return new CancelHoldResult(CancelHoldOutcome.NotFound);
+        }
+
+        var hold = await _dbContext.SeatHolds
+            .SingleOrDefaultAsync(seatHold => seatHold.Id == holdId, cancellationToken);
+
+        if (hold is null)
+        {
+            return new CancelHoldResult(CancelHoldOutcome.NotFound);
+        }
+
+        if (hold.StudentId != studentId)
+        {
+            return new CancelHoldResult(CancelHoldOutcome.Forbidden);
+        }
+
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        if (hold.Status == HoldStatus.Cancelled)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new CancelHoldResult(CancelHoldOutcome.Cancelled);
+        }
+
+        if (hold.Status == HoldStatus.Held && hold.ExpiresAt <= now)
+        {
+            hold.Status = HoldStatus.Expired;
+            hold.ExpiredAt = now;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new CancelHoldResult(CancelHoldOutcome.Conflict);
+        }
+
+        if (hold.Status is HoldStatus.Expired or HoldStatus.Confirmed)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new CancelHoldResult(CancelHoldOutcome.Conflict);
+        }
+
+        hold.Status = HoldStatus.Cancelled;
+        hold.CancelledAt = now;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return new CancelHoldResult(CancelHoldOutcome.Cancelled);
+    }
+
     public async Task<HoldResponse?> CreateAsync(
         Guid classId,
         string studentId,
