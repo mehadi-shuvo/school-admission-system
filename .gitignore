@@ -1,0 +1,153 @@
+
+# ==========================================
+# School Admission System - Git Ignore
+# Stack: .NET 10, React, PostgreSQL, Docker
+# ==========================================
+
+# ------------------------------------------
+# 1. .NET / ASP.NET Core
+# ------------------------------------------
+**/bin/
+**/obj/
+**/Debug/
+**/Release/
+**/publish/
+**/artifacts/
+
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.rsuser
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+
+# Test results and coverage
+**/TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+coverage-report/
+.coverage
+**/coverage.cobertura.xml
+
+# ------------------------------------------
+# 2. React / Vite / TypeScript
+# ------------------------------------------
+**/node_modules/
+**/dist/
+**/.vite/
+**/.cache/
+**/.turbo/
+**/.next/
+**/.parcel-cache/
+
+*.tsbuildinfo
+
+# Package manager logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ------------------------------------------
+# 3. Environment Variables and Secrets
+# ------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+**/secrets/
+*.pem
+*.pfx
+*.p12
+*.key
+
+# Local ASP.NET configuration
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+**/appsettings.Development.local.json
+
+# ------------------------------------------
+# 4. PostgreSQL / Local Database
+# ------------------------------------------
+*.sql.gz
+*.dump
+*.backup
+*.bak
+
+postgres-data/
+pgdata/
+db-data/
+
+# ------------------------------------------
+# 5. Docker
+# ------------------------------------------
+docker-compose.override.yml
+compose.override.yml
+
+# ------------------------------------------
+# 6. IDE / Editors
+# ------------------------------------------
+.vs/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+*.code-workspace
+
+# ------------------------------------------
+# 7. Operating System Files
+# ------------------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+*.swp
+*.swo
+
+# ------------------------------------------
+# 8. Logs and Temporary Files
+# ------------------------------------------
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+
+# ------------------------------------------
+# 9. Local Development Tools
+# ------------------------------------------
+.http/
+.rest-client/
+*.http.env.json
+
+# ------------------------------------------
+# 10. Assignment-specific
+# ------------------------------------------
+# Keep confidential assignment documents
+# outside the public Git repository.
+Asst_Software_Engineer_Project_Assignment.pdf
+
+# ------------------------------------------
+# IMPORTANT: Keep these files tracked
+# ------------------------------------------
+# README.md
+# ASSUMPTIONS.md
+# AI_USAGE.md
+# docker-compose.yml
+# SchoolAdmissionSystem.slnx
+# **/Dockerfile
+# **/appsettings.json
+# **/appsettings.Development.json (no secrets)
+# **/package-lock.json
+# **/Migrations/
