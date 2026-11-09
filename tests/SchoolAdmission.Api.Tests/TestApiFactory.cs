@@ -135,6 +135,46 @@ public sealed class TestSeatHoldService : ISeatHoldService
 
     public DateTime CurrentUtc { get; set; } = DateTime.UtcNow;
 
+    public int ConfirmationTransitions { get; private set; }
+
+    public Task<ConfirmHoldResult> ConfirmAsync(
+        Guid holdId,
+        string studentId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!_holdDetails.TryGetValue(holdId, out var hold))
+        {
+            return Task.FromResult(new ConfirmHoldResult(ConfirmHoldOutcome.NotFound));
+        }
+
+        if (hold.StudentId != studentId)
+        {
+            return Task.FromResult(new ConfirmHoldResult(ConfirmHoldOutcome.Forbidden));
+        }
+
+        if (hold.Status == HoldStatus.Confirmed)
+        {
+            return Task.FromResult(Confirmed(holdId));
+        }
+
+        if (hold.Status == HoldStatus.Held && hold.ExpiresAt <= CurrentUtc)
+        {
+            _holdDetails[holdId] = hold with { Status = HoldStatus.Expired };
+            return Task.FromResult(new ConfirmHoldResult(ConfirmHoldOutcome.Conflict));
+        }
+
+        if (hold.Status is HoldStatus.Expired or HoldStatus.Cancelled)
+        {
+            return Task.FromResult(new ConfirmHoldResult(ConfirmHoldOutcome.Conflict));
+        }
+
+        _holdDetails[holdId] = hold with { Status = HoldStatus.Confirmed };
+        ConfirmationTransitions++;
+        return Task.FromResult(Confirmed(holdId));
+    }
+
     public Task<HoldDetailsResponse?> GetByIdAsync(
         Guid holdId,
         CancellationToken cancellationToken)
@@ -187,7 +227,8 @@ public sealed class TestSeatHoldService : ISeatHoldService
         _holdDetails.Add(holdId, new TestHoldDetails(
             classId,
             HoldStatus.Held,
-            expiresAt));
+            expiresAt,
+            studentId));
         return Task.FromResult<HoldResponse?>(response);
     }
 
@@ -211,13 +252,26 @@ public sealed class TestSeatHoldService : ISeatHoldService
         Guid holdId,
         Guid classId,
         HoldStatus status,
-        DateTime expiresAt)
+        DateTime expiresAt,
+        string studentId = "00123456789012345")
     {
-        _holdDetails[holdId] = new TestHoldDetails(classId, status, expiresAt);
+        _holdDetails[holdId] = new TestHoldDetails(
+            classId,
+            status,
+            expiresAt,
+            studentId);
     }
 
     private sealed record TestHoldDetails(
         Guid ClassId,
         HoldStatus Status,
-        DateTime ExpiresAt);
+        DateTime ExpiresAt,
+        string StudentId);
+
+    private static ConfirmHoldResult Confirmed(Guid holdId)
+    {
+        return new ConfirmHoldResult(
+            ConfirmHoldOutcome.Confirmed,
+            new ConfirmHoldResponse(PublicId.ForHold(holdId), "CONFIRMED"));
+    }
 }

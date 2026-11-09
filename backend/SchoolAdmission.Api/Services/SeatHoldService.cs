@@ -61,6 +61,79 @@ public sealed class SeatHoldService : ISeatHoldService
             hold.ExpiresAt);
     }
 
+    public async Task<ConfirmHoldResult> ConfirmAsync(
+        Guid holdId,
+        string studentId,
+        CancellationToken cancellationToken)
+    {
+        var classId = await _dbContext.SeatHolds
+            .AsNoTracking()
+            .Where(seatHold => seatHold.Id == holdId)
+            .Select(seatHold => (Guid?)seatHold.ClassId)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (classId is null)
+        {
+            return new ConfirmHoldResult(ConfirmHoldOutcome.NotFound);
+        }
+
+        await using var transaction = await _dbContext.Database
+            .BeginTransactionAsync(cancellationToken);
+
+        var admissionClass = await _dbContext.AdmissionClasses
+            .FromSqlInterpolated(
+                $"SELECT * FROM admission_classes WHERE id = {classId.Value} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (admissionClass is null)
+        {
+            return new ConfirmHoldResult(ConfirmHoldOutcome.NotFound);
+        }
+
+        var hold = await _dbContext.SeatHolds
+            .SingleOrDefaultAsync(seatHold => seatHold.Id == holdId, cancellationToken);
+
+        if (hold is null)
+        {
+            return new ConfirmHoldResult(ConfirmHoldOutcome.NotFound);
+        }
+
+        if (hold.StudentId != studentId)
+        {
+            return new ConfirmHoldResult(ConfirmHoldOutcome.Forbidden);
+        }
+
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        if (hold.Status == HoldStatus.Confirmed)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return Confirmed(holdId);
+        }
+
+        if (hold.Status == HoldStatus.Held && hold.ExpiresAt <= now)
+        {
+            hold.Status = HoldStatus.Expired;
+            hold.ExpiredAt = now;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new ConfirmHoldResult(ConfirmHoldOutcome.Conflict);
+        }
+
+        if (hold.Status is HoldStatus.Expired or HoldStatus.Cancelled)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new ConfirmHoldResult(ConfirmHoldOutcome.Conflict);
+        }
+
+        hold.Status = HoldStatus.Confirmed;
+        hold.ConfirmedAt = now;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return Confirmed(holdId);
+    }
+
     public async Task<HoldResponse?> CreateAsync(
         Guid classId,
         string studentId,
@@ -147,6 +220,13 @@ public sealed class SeatHoldService : ISeatHoldService
         return exception.InnerException is PostgresException postgresException &&
                postgresException.SqlState == PostgresErrorCodes.UniqueViolation &&
                postgresException.ConstraintName == ActiveStudentClassConstraint;
+    }
+
+    private static ConfirmHoldResult Confirmed(Guid holdId)
+    {
+        return new ConfirmHoldResult(
+            ConfirmHoldOutcome.Confirmed,
+            new ConfirmHoldResponse(PublicId.ForHold(holdId), "CONFIRMED"));
     }
 
     private sealed record HoldDetailsProjection(

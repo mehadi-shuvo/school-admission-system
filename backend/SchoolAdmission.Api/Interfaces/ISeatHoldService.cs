@@ -4,6 +4,11 @@ namespace SchoolAdmission.Api.Interfaces;
 
 public interface ISeatHoldService
 {
+    Task<ConfirmHoldResult> ConfirmAsync(
+        Guid holdId,
+        string studentId,
+        CancellationToken cancellationToken);
+
     Task<HoldDetailsResponse?> GetByIdAsync(
         Guid holdId,
         CancellationToken cancellationToken);
