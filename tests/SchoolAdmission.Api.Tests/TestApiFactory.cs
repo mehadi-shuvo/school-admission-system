@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using SchoolAdmission.Api.Common;
 using SchoolAdmission.Api.Common.Exceptions;
 using SchoolAdmission.Api.DTOs.Classes;
+using SchoolAdmission.Api.DTOs.Holds;
 using SchoolAdmission.Api.Interfaces;
 
 namespace SchoolAdmission.Api.Tests;
@@ -17,9 +18,13 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IClassService>();
+            services.RemoveAll<ISeatHoldService>();
             services.AddSingleton<TestClassService>();
+            services.AddSingleton<TestSeatHoldService>();
             services.AddScoped<IClassService>(provider =>
                 provider.GetRequiredService<TestClassService>());
+            services.AddScoped<ISeatHoldService>(provider =>
+                provider.GetRequiredService<TestSeatHoldService>());
         });
     }
 }
@@ -115,5 +120,57 @@ public sealed class FailingClassService : IClassService
         CancellationToken cancellationToken)
     {
         throw new InvalidOperationException("Database connection details must remain private.");
+    }
+}
+
+public sealed class TestSeatHoldService : ISeatHoldService
+{
+    private readonly Dictionary<(Guid ClassId, string StudentId), HoldResponse> _holds = [];
+    private readonly HashSet<Guid> _knownClasses = [];
+    private readonly HashSet<Guid> _fullClasses = [];
+
+    public TimeSpan HoldDuration { get; set; } = TimeSpan.FromMinutes(10);
+
+    public Task<HoldResponse?> CreateAsync(
+        Guid classId,
+        string studentId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!_knownClasses.Contains(classId))
+        {
+            return Task.FromResult<HoldResponse?>(null);
+        }
+
+        if (_fullClasses.Contains(classId) || _holds.ContainsKey((classId, studentId)))
+        {
+            throw new SeatHoldConflictException("Seat hold could not be created.");
+        }
+
+        var response = new HoldResponse(
+            PublicId.ForHold(Guid.NewGuid()),
+            PublicId.ForClass(classId),
+            studentId,
+            "HELD",
+            DateTime.UtcNow.Add(HoldDuration));
+        _holds.Add((classId, studentId), response);
+        return Task.FromResult<HoldResponse?>(response);
+    }
+
+    public void SetKnownClasses(params Guid[] classIds)
+    {
+        foreach (var classId in classIds)
+        {
+            _knownClasses.Add(classId);
+        }
+    }
+
+    public void SetFullClasses(params Guid[] classIds)
+    {
+        foreach (var classId in classIds)
+        {
+            _fullClasses.Add(classId);
+        }
     }
 }

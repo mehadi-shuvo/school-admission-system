@@ -30,10 +30,11 @@ public sealed class ClassService : IClassService
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var classes = await AvailabilityProjection(
-                _dbContext.AdmissionClasses.AsNoTracking(),
+                _dbContext.AdmissionClasses
+                    .AsNoTracking()
+                    .OrderBy(admissionClass => admissionClass.Name)
+                    .ThenBy(admissionClass => admissionClass.Id),
                 now)
-            .OrderBy(admissionClass => admissionClass.Name)
-            .ThenBy(admissionClass => admissionClass.Id)
             .ToListAsync(cancellationToken);
 
         return classes.Select(ToResponse)

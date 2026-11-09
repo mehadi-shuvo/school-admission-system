@@ -25,6 +25,7 @@ services:
     command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      HOLD_DURATION_SECONDS: ${HOLD_DURATION_SECONDS:-600}
       ConnectionStrings__AdmissionDb: Host=db;Port=5432;Database=${POSTGRES_DB:-school_admission};Username=${POSTGRES_USER:-school_admission};Password=${POSTGRES_PASSWORD:-local-development-only-password}
     depends_on:
       db:
@@ -39,6 +40,7 @@ services:
       dockerfile: backend/SchoolAdmission.Api/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      HOLD_DURATION_SECONDS: ${HOLD_DURATION_SECONDS:-600}
       ConnectionStrings__AdmissionDb: Host=db;Port=5432;Database=${POSTGRES_DB:-school_admission};Username=${POSTGRES_USER:-school_admission};Password=${POSTGRES_PASSWORD:-local-development-only-password}
     depends_on:
       migrate:

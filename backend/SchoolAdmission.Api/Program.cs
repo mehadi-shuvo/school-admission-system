@@ -9,6 +9,18 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+var holdDuration = builder.Configuration["HOLD_DURATION_SECONDS"];
+var holdDurationSeconds = 600;
+
+if (holdDuration is not null &&
+    (!int.TryParse(holdDuration, out holdDurationSeconds) ||
+        holdDurationSeconds <= 0))
+{
+    throw new InvalidOperationException(
+        "HOLD_DURATION_SECONDS must be a positive integer.");
+}
+builder.Services.AddSingleton(new HoldSettings(
+    TimeSpan.FromSeconds(holdDurationSeconds)));
 builder.Services.AddDbContext<AdmissionDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("AdmissionDb");
@@ -22,6 +34,7 @@ builder.Services.AddDbContext<AdmissionDbContext>(options =>
     options.UseNpgsql(connectionString);
 });
 builder.Services.AddScoped<IClassService, ClassService>();
+builder.Services.AddScoped<ISeatHoldService, SeatHoldService>();
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AdmissionDbContext>("database");
 
