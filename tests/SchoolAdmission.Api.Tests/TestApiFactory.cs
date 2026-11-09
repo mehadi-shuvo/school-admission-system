@@ -6,6 +6,7 @@ using SchoolAdmission.Api.Common;
 using SchoolAdmission.Api.Common.Exceptions;
 using SchoolAdmission.Api.DTOs.Classes;
 using SchoolAdmission.Api.DTOs.Holds;
+using SchoolAdmission.Api.Entities;
 using SchoolAdmission.Api.Interfaces;
 
 namespace SchoolAdmission.Api.Tests;
@@ -126,10 +127,36 @@ public sealed class FailingClassService : IClassService
 public sealed class TestSeatHoldService : ISeatHoldService
 {
     private readonly Dictionary<(Guid ClassId, string StudentId), HoldResponse> _holds = [];
+    private readonly Dictionary<Guid, TestHoldDetails> _holdDetails = [];
     private readonly HashSet<Guid> _knownClasses = [];
     private readonly HashSet<Guid> _fullClasses = [];
 
     public TimeSpan HoldDuration { get; set; } = TimeSpan.FromMinutes(10);
+
+    public DateTime CurrentUtc { get; set; } = DateTime.UtcNow;
+
+    public Task<HoldDetailsResponse?> GetByIdAsync(
+        Guid holdId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!_holdDetails.TryGetValue(holdId, out var hold))
+        {
+            return Task.FromResult<HoldDetailsResponse?>(null);
+        }
+
+        var effectiveStatus = hold.Status == HoldStatus.Held &&
+                              hold.ExpiresAt <= CurrentUtc
+            ? HoldStatus.Expired
+            : hold.Status;
+
+        return Task.FromResult<HoldDetailsResponse?>(new HoldDetailsResponse(
+            PublicId.ForHold(holdId),
+            PublicId.ForClass(hold.ClassId),
+            effectiveStatus.ToString().ToUpperInvariant(),
+            hold.ExpiresAt));
+    }
 
     public Task<HoldResponse?> CreateAsync(
         Guid classId,
@@ -148,13 +175,19 @@ public sealed class TestSeatHoldService : ISeatHoldService
             throw new SeatHoldConflictException("Seat hold could not be created.");
         }
 
+        var holdId = Guid.NewGuid();
+        var expiresAt = DateTime.UtcNow.Add(HoldDuration);
         var response = new HoldResponse(
-            PublicId.ForHold(Guid.NewGuid()),
+            PublicId.ForHold(holdId),
             PublicId.ForClass(classId),
             studentId,
             "HELD",
-            DateTime.UtcNow.Add(HoldDuration));
+            expiresAt);
         _holds.Add((classId, studentId), response);
+        _holdDetails.Add(holdId, new TestHoldDetails(
+            classId,
+            HoldStatus.Held,
+            expiresAt));
         return Task.FromResult<HoldResponse?>(response);
     }
 
@@ -173,4 +206,18 @@ public sealed class TestSeatHoldService : ISeatHoldService
             _fullClasses.Add(classId);
         }
     }
+
+    public void SetHoldDetails(
+        Guid holdId,
+        Guid classId,
+        HoldStatus status,
+        DateTime expiresAt)
+    {
+        _holdDetails[holdId] = new TestHoldDetails(classId, status, expiresAt);
+    }
+
+    private sealed record TestHoldDetails(
+        Guid ClassId,
+        HoldStatus Status,
+        DateTime ExpiresAt);
 }

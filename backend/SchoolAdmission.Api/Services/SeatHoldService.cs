@@ -28,6 +28,39 @@ public sealed class SeatHoldService : ISeatHoldService
         _settings = settings;
     }
 
+    public async Task<HoldDetailsResponse?> GetByIdAsync(
+        Guid holdId,
+        CancellationToken cancellationToken)
+    {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        var hold = await _dbContext.SeatHolds
+            .AsNoTracking()
+            .Where(seatHold => seatHold.Id == holdId)
+            .Select(seatHold => new HoldDetailsProjection(
+                seatHold.Id,
+                seatHold.ClassId,
+                seatHold.Status,
+                seatHold.ExpiresAt))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (hold is null)
+        {
+            return null;
+        }
+
+        var effectiveStatus = hold.Status == HoldStatus.Held &&
+                              hold.ExpiresAt <= now
+            ? HoldStatus.Expired
+            : hold.Status;
+
+        return new HoldDetailsResponse(
+            PublicId.ForHold(hold.Id),
+            PublicId.ForClass(hold.ClassId),
+            effectiveStatus.ToString().ToUpperInvariant(),
+            hold.ExpiresAt);
+    }
+
     public async Task<HoldResponse?> CreateAsync(
         Guid classId,
         string studentId,
@@ -115,4 +148,10 @@ public sealed class SeatHoldService : ISeatHoldService
                postgresException.SqlState == PostgresErrorCodes.UniqueViolation &&
                postgresException.ConstraintName == ActiveStudentClassConstraint;
     }
+
+    private sealed record HoldDetailsProjection(
+        Guid Id,
+        Guid ClassId,
+        HoldStatus Status,
+        DateTime ExpiresAt);
 }
