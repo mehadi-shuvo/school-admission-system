@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using SchoolAdmission.Api.Common;
 using SchoolAdmission.Api.Common.Exceptions;
 using SchoolAdmission.Api.DTOs.Classes;
 using SchoolAdmission.Api.Interfaces;
@@ -23,6 +24,37 @@ public sealed class ClassesController : ControllerBase
         GetAll(CancellationToken cancellationToken)
     {
         var response = await _classService.GetAllAsync(cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpGet("{classId}")]
+    [ProducesResponseType<ClassAvailabilityResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ClassAvailabilityResponse>> GetById(
+        string classId,
+        CancellationToken cancellationToken)
+    {
+        if (!PublicId.TryParseClassId(classId, out var id))
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Invalid admission class identifier.",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var response = await _classService.GetByIdAsync(id, cancellationToken);
+
+        if (response is null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Admission class was not found.",
+                Status = StatusCodes.Status404NotFound
+            });
+        }
+
         return Ok(response);
     }
 

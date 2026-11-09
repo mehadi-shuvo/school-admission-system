@@ -4,6 +4,10 @@ namespace SchoolAdmission.Api.Interfaces;
 
 public interface IClassService
 {
+    Task<ClassAvailabilityResponse?> GetByIdAsync(
+        Guid classId,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<ClassAvailabilityResponse>> GetAllAsync(
         CancellationToken cancellationToken);
 

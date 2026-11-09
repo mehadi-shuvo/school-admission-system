@@ -29,33 +29,31 @@ public sealed class ClassService : IClassService
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
-        var classes = await _dbContext.AdmissionClasses
-            .AsNoTracking()
+        var classes = await AvailabilityProjection(
+                _dbContext.AdmissionClasses.AsNoTracking(),
+                now)
             .OrderBy(admissionClass => admissionClass.Name)
             .ThenBy(admissionClass => admissionClass.Id)
-            .Select(admissionClass => new
-            {
-                admissionClass.Id,
-                admissionClass.Name,
-                admissionClass.TotalSeats,
-                HeldSeats = admissionClass.Holds.Count(hold =>
-                    hold.Status == HoldStatus.Held && hold.ExpiresAt > now),
-                ConfirmedSeats = admissionClass.Holds.Count(hold =>
-                    hold.Status == HoldStatus.Confirmed)
-            })
             .ToListAsync(cancellationToken);
 
-        return classes
-            .Select(admissionClass => new ClassAvailabilityResponse(
-                PublicId.ForClass(admissionClass.Id),
-                admissionClass.Name,
-                admissionClass.TotalSeats,
-                admissionClass.HeldSeats,
-                admissionClass.ConfirmedSeats,
-                admissionClass.TotalSeats -
-                    admissionClass.HeldSeats -
-                    admissionClass.ConfirmedSeats))
+        return classes.Select(ToResponse)
             .ToList();
+    }
+
+    public async Task<ClassAvailabilityResponse?> GetByIdAsync(
+        Guid classId,
+        CancellationToken cancellationToken)
+    {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        var admissionClass = await AvailabilityProjection(
+                _dbContext.AdmissionClasses
+                    .AsNoTracking()
+                    .Where(admissionClass => admissionClass.Id == classId),
+                now)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return admissionClass is null ? null : ToResponse(admissionClass);
     }
 
     public async Task<ClassResponse> CreateAsync(
@@ -122,4 +120,40 @@ public sealed class ClassService : IClassService
                postgresException.SqlState == PostgresErrorCodes.UniqueViolation &&
                postgresException.ConstraintName == ClassNameUniqueConstraint;
     }
+
+    private static IQueryable<ClassAvailabilityProjection> AvailabilityProjection(
+        IQueryable<AdmissionClass> classes,
+        DateTime now)
+    {
+        return classes
+            .Select(admissionClass => new ClassAvailabilityProjection(
+                admissionClass.Id,
+                admissionClass.Name,
+                admissionClass.TotalSeats,
+                admissionClass.Holds.Count(hold =>
+                    hold.Status == HoldStatus.Held && hold.ExpiresAt > now),
+                admissionClass.Holds.Count(hold =>
+                    hold.Status == HoldStatus.Confirmed)));
+    }
+
+    private static ClassAvailabilityResponse ToResponse(
+        ClassAvailabilityProjection admissionClass)
+    {
+        return new ClassAvailabilityResponse(
+            PublicId.ForClass(admissionClass.Id),
+            admissionClass.Name,
+            admissionClass.TotalSeats,
+            admissionClass.HeldSeats,
+            admissionClass.ConfirmedSeats,
+            admissionClass.TotalSeats -
+                admissionClass.HeldSeats -
+                admissionClass.ConfirmedSeats);
+    }
+
+    private sealed record ClassAvailabilityProjection(
+        Guid Id,
+        string Name,
+        int TotalSeats,
+        int HeldSeats,
+        int ConfirmedSeats);
 }

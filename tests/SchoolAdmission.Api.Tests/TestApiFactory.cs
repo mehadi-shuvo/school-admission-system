@@ -27,6 +27,7 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>
 public sealed class TestClassService : IClassService
 {
     private readonly HashSet<string> _classNames = new(StringComparer.Ordinal);
+    private readonly Dictionary<Guid, ClassAvailabilityResponse> _classDetails = [];
     private IReadOnlyList<ClassAvailabilityResponse> _classes =
         Array.Empty<ClassAvailabilityResponse>();
 
@@ -37,9 +38,29 @@ public sealed class TestClassService : IClassService
         return Task.FromResult(_classes);
     }
 
+    public Task<ClassAvailabilityResponse?> GetByIdAsync(
+        Guid classId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _classDetails.TryGetValue(classId, out var response);
+        return Task.FromResult(response);
+    }
+
     public void SetClasses(params ClassAvailabilityResponse[] classes)
     {
         _classes = classes;
+    }
+
+    public void SetClassDetails(params ClassAvailabilityResponse[] classes)
+    {
+        foreach (var admissionClass in classes)
+        {
+            if (PublicId.TryParseClassId(admissionClass.Id, out var id))
+            {
+                _classDetails[id] = admissionClass;
+            }
+        }
     }
 
     public Task<ClassResponse> CreateAsync(
@@ -76,6 +97,13 @@ public sealed class TestClassService : IClassService
 
 public sealed class FailingClassService : IClassService
 {
+    public Task<ClassAvailabilityResponse?> GetByIdAsync(
+        Guid classId,
+        CancellationToken cancellationToken)
+    {
+        throw new InvalidOperationException("Database connection details must remain private.");
+    }
+
     public Task<IReadOnlyList<ClassAvailabilityResponse>> GetAllAsync(
         CancellationToken cancellationToken)
     {
