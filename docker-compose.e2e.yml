@@ -1,0 +1,72 @@
+services:
+  e2e-db:
+    image: postgres:17.4-alpine
+    environment:
+      POSTGRES_DB: school_admission_e2e
+      POSTGRES_USER: school_admission_e2e
+      POSTGRES_PASSWORD: e2e-disposable-password
+    volumes:
+      - e2e-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    networks:
+      - e2e-internal
+
+  e2e-migrate:
+    build:
+      context: .
+      dockerfile: backend/SchoolAdmission.Api/Dockerfile
+    command: ["--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      HOLD_DURATION_SECONDS: "15"
+      ConnectionStrings__AdmissionDb: Host=e2e-db;Port=5432;Database=school_admission_e2e;Username=school_admission_e2e;Password=e2e-disposable-password
+    depends_on:
+      e2e-db:
+        condition: service_healthy
+    networks:
+      - e2e-internal
+    restart: "no"
+
+  e2e-backend:
+    build:
+      context: .
+      dockerfile: backend/SchoolAdmission.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      HOLD_DURATION_SECONDS: "15"
+      ConnectionStrings__AdmissionDb: Host=e2e-db;Port=5432;Database=school_admission_e2e;Username=school_admission_e2e;Password=e2e-disposable-password
+    depends_on:
+      e2e-migrate:
+        condition: service_completed_successfully
+    networks:
+      e2e-application:
+        aliases:
+          - backend
+      e2e-internal: {}
+    init: true
+
+  e2e-frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      e2e-backend:
+        condition: service_started
+    ports:
+      - "127.0.0.1:3100:80"
+    networks:
+      - e2e-application
+    init: true
+
+volumes:
+  e2e-postgres-data:
+
+networks:
+  e2e-application:
+  e2e-internal:
+    internal: true
