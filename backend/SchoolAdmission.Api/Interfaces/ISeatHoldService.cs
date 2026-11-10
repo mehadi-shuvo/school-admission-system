@@ -4,6 +4,10 @@ namespace SchoolAdmission.Api.Interfaces;
 
 public interface ISeatHoldService
 {
+    Task<IReadOnlyList<StudentHoldResponse>> GetStudentHoldsAsync(
+        string studentId,
+        CancellationToken cancellationToken);
+
     Task<CancelHoldResult> CancelAsync(
         Guid holdId,
         string studentId,

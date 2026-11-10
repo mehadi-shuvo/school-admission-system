@@ -128,6 +128,7 @@ public sealed class TestSeatHoldService : ISeatHoldService
 {
     private readonly Dictionary<(Guid ClassId, string StudentId), HoldResponse> _holds = [];
     private readonly Dictionary<Guid, TestHoldDetails> _holdDetails = [];
+    private IReadOnlyList<TestStudentHold> _studentHolds = [];
     private readonly HashSet<Guid> _knownClasses = [];
     private readonly HashSet<Guid> _fullClasses = [];
 
@@ -138,6 +139,28 @@ public sealed class TestSeatHoldService : ISeatHoldService
     public int ConfirmationTransitions { get; private set; }
 
     public int CancellationTransitions { get; private set; }
+
+    public Task<IReadOnlyList<StudentHoldResponse>> GetStudentHoldsAsync(
+        string studentId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        IReadOnlyList<StudentHoldResponse> response = _studentHolds
+            .Where(hold => hold.StudentId == studentId)
+            .OrderByDescending(hold => hold.CreatedAt)
+            .ThenBy(hold => hold.HoldId)
+            .Select(hold => new StudentHoldResponse(
+                PublicId.ForHold(hold.HoldId),
+                PublicId.ForClass(hold.ClassId),
+                hold.ClassName,
+                EffectiveStatus(hold.Status, hold.ExpiresAt)
+                    .ToString()
+                    .ToUpperInvariant(),
+                hold.ExpiresAt))
+            .ToList();
+        return Task.FromResult(response);
+    }
 
     public Task<CancelHoldResult> CancelAsync(
         Guid holdId,
@@ -309,6 +332,11 @@ public sealed class TestSeatHoldService : ISeatHoldService
             cancelledAt);
     }
 
+    public void SetStudentHolds(params TestStudentHold[] holds)
+    {
+        _studentHolds = holds;
+    }
+
     public DateTime? GetCancelledAt(Guid holdId)
     {
         return _holdDetails.TryGetValue(holdId, out var hold)
@@ -323,10 +351,26 @@ public sealed class TestSeatHoldService : ISeatHoldService
         string StudentId,
         DateTime? CancelledAt);
 
+    public sealed record TestStudentHold(
+        Guid HoldId,
+        Guid ClassId,
+        string ClassName,
+        HoldStatus Status,
+        DateTime ExpiresAt,
+        string StudentId,
+        DateTime CreatedAt);
+
     private static ConfirmHoldResult Confirmed(Guid holdId)
     {
         return new ConfirmHoldResult(
             ConfirmHoldOutcome.Confirmed,
             new ConfirmHoldResponse(PublicId.ForHold(holdId), "CONFIRMED"));
+    }
+
+    private HoldStatus EffectiveStatus(HoldStatus status, DateTime expiresAt)
+    {
+        return status == HoldStatus.Held && expiresAt <= CurrentUtc
+            ? HoldStatus.Expired
+            : status;
     }
 }

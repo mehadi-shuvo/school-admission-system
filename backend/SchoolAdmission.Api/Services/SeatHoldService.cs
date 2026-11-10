@@ -49,16 +49,43 @@ public sealed class SeatHoldService : ISeatHoldService
             return null;
         }
 
-        var effectiveStatus = hold.Status == HoldStatus.Held &&
-                              hold.ExpiresAt <= now
-            ? HoldStatus.Expired
-            : hold.Status;
+        var effectiveStatus = EffectiveStatus(hold.Status, hold.ExpiresAt, now);
 
         return new HoldDetailsResponse(
             PublicId.ForHold(hold.Id),
             PublicId.ForClass(hold.ClassId),
             effectiveStatus.ToString().ToUpperInvariant(),
             hold.ExpiresAt);
+    }
+
+    public async Task<IReadOnlyList<StudentHoldResponse>> GetStudentHoldsAsync(
+        string studentId,
+        CancellationToken cancellationToken)
+    {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        var holds = await _dbContext.SeatHolds
+            .AsNoTracking()
+            .Where(seatHold => seatHold.StudentId == studentId)
+            .OrderByDescending(seatHold => seatHold.CreatedAt)
+            .ThenBy(seatHold => seatHold.Id)
+            .Select(seatHold => new StudentHoldProjection(
+                seatHold.Id,
+                seatHold.ClassId,
+                seatHold.Class.Name,
+                seatHold.Status,
+                seatHold.ExpiresAt))
+            .ToListAsync(cancellationToken);
+
+        return holds.Select(hold => new StudentHoldResponse(
+                PublicId.ForHold(hold.Id),
+                PublicId.ForClass(hold.ClassId),
+                hold.ClassName,
+                EffectiveStatus(hold.Status, hold.ExpiresAt, now)
+                    .ToString()
+                    .ToUpperInvariant(),
+                hold.ExpiresAt))
+            .ToList();
     }
 
     public async Task<ConfirmHoldResult> ConfirmAsync(
@@ -302,9 +329,26 @@ public sealed class SeatHoldService : ISeatHoldService
             new ConfirmHoldResponse(PublicId.ForHold(holdId), "CONFIRMED"));
     }
 
+    private static HoldStatus EffectiveStatus(
+        HoldStatus status,
+        DateTime expiresAt,
+        DateTime now)
+    {
+        return status == HoldStatus.Held && expiresAt <= now
+            ? HoldStatus.Expired
+            : status;
+    }
+
     private sealed record HoldDetailsProjection(
         Guid Id,
         Guid ClassId,
+        HoldStatus Status,
+        DateTime ExpiresAt);
+
+    private sealed record StudentHoldProjection(
+        Guid Id,
+        Guid ClassId,
+        string ClassName,
         HoldStatus Status,
         DateTime ExpiresAt);
 }
