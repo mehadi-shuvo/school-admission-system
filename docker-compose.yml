@@ -53,6 +53,20 @@ services:
     restart: unless-stopped
     init: true
 
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - application
+    restart: unless-stopped
+    init: true
+
 volumes:
   postgres-data:
 
