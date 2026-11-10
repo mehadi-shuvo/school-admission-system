@@ -102,11 +102,11 @@ describe("My Holds workflow", () => {
     const confirmedCard = screen.getByRole("heading", { name: "Class 6 Afternoon" }).closest("article");
     const cancelledCard = screen.getByRole("heading", { name: "Class 7 Morning" }).closest("article");
     const expiredCard = screen.getByRole("heading", { name: "Class 7 Afternoon" }).closest("article");
-    expect(heldCard).toHaveTextContent("Confirm seat");
+    expect(heldCard).toHaveTextContent("Pay admission fee (demo) & confirm");
     expect(heldCard).toHaveTextContent("Cancel hold");
     expect(confirmedCard).not.toHaveTextContent("Cancel hold");
     expect(confirmedCard).not.toHaveTextContent("Time remaining");
-    expect(cancelledCard).not.toHaveTextContent("Confirm seat");
+    expect(cancelledCard).not.toHaveTextContent("Pay admission fee (demo) & confirm");
     expect(expiredCard).not.toHaveTextContent("Cancel hold");
   });
 
@@ -115,7 +115,7 @@ describe("My Holds workflow", () => {
     getStudentHolds.mockResolvedValueOnce([holds[0]]).mockResolvedValueOnce([{ ...holds[0], status: "CONFIRMED" }]);
     renderPage();
     await loadHistory(user);
-    await user.click(screen.getByRole("button", { name: "Confirm seat" }));
+    await user.click(screen.getByRole("button", { name: "Pay admission fee (demo) & confirm" }));
     expect(await screen.findByText("CONFIRMED")).toBeInTheDocument();
     expect(confirmHold).toHaveBeenCalledWith("h_held", studentId);
     await waitFor(() => expect(getStudentHolds).toHaveBeenCalledTimes(2));
@@ -139,7 +139,7 @@ describe("My Holds workflow", () => {
     getStudentHolds.mockResolvedValueOnce([holds[0]]).mockResolvedValueOnce([{ ...holds[0], status: "EXPIRED" }]);
     renderPage();
     await loadHistory(user);
-    await user.click(screen.getByRole("button", { name: "Confirm seat" }));
+    await user.click(screen.getByRole("button", { name: "Pay admission fee (demo) & confirm" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("can no longer be confirmed");
     await waitFor(() => expect(getStudentHolds).toHaveBeenCalledTimes(2));
   });
@@ -162,7 +162,7 @@ describe("My Holds workflow", () => {
     getStudentHolds.mockResolvedValueOnce([holds[0]]);
     renderPage();
     await loadHistory(user);
-    await user.click(screen.getByRole("button", { name: "Confirm seat" }));
+    await user.click(screen.getByRole("button", { name: "Pay admission fee (demo) & confirm" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("may have succeeded");
     expect(confirmHold).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: "Refresh status" })).toBeInTheDocument();
@@ -175,7 +175,7 @@ describe("My Holds workflow", () => {
     getStudentHolds.mockResolvedValueOnce([holds[0]]).mockResolvedValueOnce([{ ...holds[0], status: "CONFIRMED" }]);
     renderPage();
     await loadHistory(user);
-    const confirmButton = screen.getByRole("button", { name: "Confirm seat" });
+    const confirmButton = screen.getByRole("button", { name: "Pay admission fee (demo) & confirm" });
     await user.click(confirmButton);
     await user.click(confirmButton);
     expect(confirmHold).toHaveBeenCalledTimes(1);

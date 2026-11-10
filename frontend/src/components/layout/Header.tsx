@@ -2,14 +2,19 @@ import { GraduationCap, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { Container } from "../ui/Container";
+import { isValidStudentId } from "../../lib/utils/studentId";
+import { useReservation } from "../../features/holds/context/ReservationContext";
 
 const navigation = [
   { to: "/", label: "Classes", end: true },
-  { to: "/my-holds", label: "My Holds" }
+  { to: "/my-holds", label: "My Holds" },
+  { to: "/admin/classes", label: "School Admin" }
 ];
 
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
+  const { studentId, setStudentId, clearStudentId } = useReservation();
+  const hasInvalidValue = studentId.length > 0 && !isValidStudentId(studentId);
 
   return (
     <header className="border-b border-slate-200 bg-white">
@@ -19,14 +24,22 @@ export function Header() {
             <span className="grid size-9 place-items-center rounded-lg bg-blue-700 text-white"><GraduationCap aria-hidden="true" className="size-5" /></span>
             <span>School Admission</span>
           </NavLink>
-          <nav aria-label="Main navigation" className="hidden items-center gap-1 sm:flex">
+          <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
             <NavigationLinks onNavigate={() => setIsOpen(false)} />
           </nav>
-          <button aria-controls="mobile-navigation" aria-expanded={isOpen} aria-label="Toggle navigation" className="grid size-10 place-items-center rounded-lg text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 sm:hidden" onClick={() => setIsOpen((open) => !open)} type="button">
+          <div className="hidden min-w-52 lg:block">
+            <label className="block text-xs font-semibold text-slate-700" htmlFor="shared-student-id">Student ID</label>
+            <div className="mt-1 flex gap-2">
+              <input aria-describedby="shared-student-id-error" aria-invalid={hasInvalidValue} autoComplete="off" className="min-h-9 min-w-0 flex-1 rounded-md border border-slate-300 px-2 text-sm outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100" id="shared-student-id" inputMode="numeric" maxLength={17} onChange={(event) => setStudentId(event.target.value)} pattern="[0-9]{17}" placeholder="17 digits" type="text" value={studentId} />
+              {studentId ? <button className="rounded-md px-2 text-xs font-semibold text-blue-800 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" onClick={clearStudentId} type="button">Clear</button> : null}
+            </div>
+            <p className="mt-1 text-xs text-red-700" id="shared-student-id-error" role={hasInvalidValue ? "alert" : undefined}>{hasInvalidValue ? "Enter exactly 17 ASCII digits." : ""}</p>
+          </div>
+          <button aria-controls="mobile-navigation" aria-expanded={isOpen} aria-label="Toggle navigation" className="grid size-10 place-items-center rounded-lg text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 lg:hidden" onClick={() => setIsOpen((open) => !open)} type="button">
             {isOpen ? <X aria-hidden="true" className="size-5" /> : <Menu aria-hidden="true" className="size-5" />}
           </button>
         </div>
-        {isOpen ? <nav id="mobile-navigation" aria-label="Mobile navigation" className="border-t border-slate-100 py-3 sm:hidden"><NavigationLinks onNavigate={() => setIsOpen(false)} /></nav> : null}
+        {isOpen ? <div id="mobile-navigation" className="border-t border-slate-100 py-3 lg:hidden"><nav aria-label="Mobile navigation"><NavigationLinks onNavigate={() => setIsOpen(false)} /></nav><div className="mt-3"><label className="block text-sm font-semibold text-slate-900" htmlFor="shared-student-id-mobile">Student ID</label><div className="mt-2 flex gap-2"><input aria-describedby="shared-student-id-mobile-error" aria-invalid={hasInvalidValue} autoComplete="off" className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-300 px-3 text-slate-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100" id="shared-student-id-mobile" inputMode="numeric" maxLength={17} onChange={(event) => setStudentId(event.target.value)} pattern="[0-9]{17}" placeholder="17-digit Student ID" type="text" value={studentId} />{studentId ? <button className="rounded-lg px-3 text-sm font-semibold text-blue-800 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" onClick={clearStudentId} type="button">Clear</button> : null}</div><p className="mt-1 text-sm text-red-700" id="shared-student-id-mobile-error" role={hasInvalidValue ? "alert" : undefined}>{hasInvalidValue ? "Enter exactly 17 ASCII digits." : ""}</p></div></div> : null}
       </Container>
     </header>
   );

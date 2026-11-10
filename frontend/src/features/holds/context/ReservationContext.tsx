@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type PropsWithChildren } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren } from "react";
 import type { HoldCreated, HoldStatus } from "../../../types/api";
 
 export interface ReservationHandoff {
@@ -8,6 +8,9 @@ export interface ReservationHandoff {
 }
 
 interface ReservationContextValue {
+  studentId: string;
+  setStudentId: (studentId: string) => void;
+  clearStudentId: () => void;
   latestReservation: ReservationHandoff | null;
   setLatestReservation: (reservation: ReservationHandoff | null) => void;
   reconcileLatestReservation: (holdId: string, status: HoldStatus) => void;
@@ -17,10 +20,32 @@ interface ReservationContextValue {
 const ReservationContext = createContext<ReservationContextValue | null>(null);
 
 export function ReservationProvider({ children }: PropsWithChildren) {
+  const [studentId, setStudentIdState] = useState("");
   const [latestReservation, setLatestReservation] = useState<ReservationHandoff | null>(null);
+
+  const setStudentId = useCallback((nextStudentId: string) => {
+    setStudentIdState(nextStudentId);
+    setLatestReservation((current) => current?.hold.studentId === nextStudentId ? current : null);
+  }, []);
+
+  const clearStudentId = useCallback(() => {
+    setStudentIdState("");
+    setLatestReservation(null);
+  }, []);
+
+  const setLatestReservationForStudent = useCallback((reservation: ReservationHandoff | null) => {
+    setLatestReservation(reservation);
+    if (reservation) {
+      setStudentIdState(reservation.hold.studentId);
+    }
+  }, []);
+
   const value = useMemo(() => ({
+    studentId,
+    setStudentId,
+    clearStudentId,
     latestReservation,
-    setLatestReservation,
+    setLatestReservation: setLatestReservationForStudent,
     reconcileLatestReservation: (holdId: string, status: HoldStatus) => {
       setLatestReservation((current) => {
         if (!current || current.hold.holdId !== holdId) {
@@ -32,7 +57,7 @@ export function ReservationProvider({ children }: PropsWithChildren) {
       });
     },
     clearLatestReservation: () => setLatestReservation(null)
-  }), [latestReservation]);
+  }), [clearStudentId, latestReservation, setLatestReservationForStudent, setStudentId, studentId]);
 
   return <ReservationContext.Provider value={value}>{children}</ReservationContext.Provider>;
 }

@@ -13,34 +13,35 @@ import { useStudentHolds } from "../holds/hooks/useStudentHolds";
 import { toHoldDisplayError } from "../holds/utils/holdError";
 
 export function MyHoldsPage() {
-  const { latestReservation, reconcileLatestReservation } = useReservation();
+  const { latestReservation, reconcileLatestReservation, studentId, setStudentId, clearStudentId } = useReservation();
   const history = useStudentHolds();
-  const [studentId, setStudentId] = useState("");
   const [touched, setTouched] = useState(false);
   const handoffStudentId = latestReservation?.hold.studentId;
   const fetchedHandoffFor = useRef<string | null>(null);
   const validStudentId = isValidStudentId(studentId);
 
   useEffect(() => {
-    if (handoffStudentId && fetchedHandoffFor.current !== handoffStudentId) {
+    if (handoffStudentId && validStudentId && fetchedHandoffFor.current !== handoffStudentId) {
       fetchedHandoffFor.current = handoffStudentId;
-      setStudentId(handoffStudentId);
-      setTouched(false);
       void history.load(handoffStudentId);
     }
-  }, [handoffStudentId, history.load]);
+  }, [handoffStudentId, history.load, validStudentId]);
+
+  useEffect(() => {
+    if (history.studentId && (!validStudentId || history.studentId !== studentId)) {
+      history.clear();
+    }
+  }, [history.clear, history.studentId, studentId, validStudentId]);
 
   function submitLookup(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setTouched(true);
-    if (validStudentId) {
-      void history.load(studentId);
-    }
+    if (validStudentId) void history.load(studentId);
   }
 
   function switchStudent() {
     history.clear();
-    setStudentId("");
+    clearStudentId();
     setTouched(false);
   }
 
@@ -69,11 +70,8 @@ export function MyHoldsPage() {
       <PageHeading title="My reservations" description="Use the assignment-defined student identifier to view and manage your own admission reservations." />
       <section aria-labelledby="history-lookup-title" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <h2 className="text-lg font-semibold text-slate-950" id="history-lookup-title">Find reservation history</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">Enter the Student ID used for the reservation. This is a lookup identifier, not a sign-in method.</p>
-        <form className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-start" noValidate onSubmit={submitLookup}>
-          <div className="min-w-0 flex-1"><label className="block text-sm font-semibold text-slate-900" htmlFor="history-student-id">Student ID</label><input aria-describedby="history-student-id-help history-student-id-error" aria-invalid={touched && !validStudentId} autoComplete="off" className="mt-2 block min-h-11 w-full rounded-lg border border-slate-300 px-3 text-slate-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100" id="history-student-id" inputMode="numeric" maxLength={17} onBlur={() => setTouched(true)} onChange={(event) => { const nextStudentId = event.target.value; setStudentId(nextStudentId); if (nextStudentId !== history.studentId) history.clear(); }} pattern="[0-9]{17}" placeholder="17-digit Student ID" type="text" value={studentId} /><p className="mt-2 text-sm text-slate-600" id="history-student-id-help">Leading zeros are preserved.</p><p className="mt-1 min-h-5 text-sm text-red-700" id="history-student-id-error" role={touched && !validStudentId ? "alert" : undefined}>{touched && !validStudentId ? "Enter exactly 17 ASCII digits." : ""}</p></div>
-          <Button className="sm:mt-7" disabled={!validStudentId || history.isLoading} type="submit">{history.isLoading ? "Loading history…" : "View reservations"}</Button>
-        </form>
+        <p className="mt-1 text-sm leading-6 text-slate-600">This Student ID is shared with the page header. It is a lookup identifier, not a sign-in method.</p>
+        <form className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-start" noValidate onSubmit={submitLookup}><div className="min-w-0 flex-1"><label className="block text-sm font-semibold text-slate-900" htmlFor="history-student-id">Student ID</label><input aria-describedby="history-student-id-help history-student-id-error" aria-invalid={touched && !validStudentId} autoComplete="off" className="mt-2 block min-h-11 w-full rounded-lg border border-slate-300 px-3 text-slate-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100" id="history-student-id" inputMode="numeric" maxLength={17} onBlur={() => setTouched(true)} onChange={(event) => setStudentId(event.target.value)} pattern="[0-9]{17}" placeholder="17-digit Student ID" type="text" value={studentId} /><p className="mt-2 text-sm text-slate-600" id="history-student-id-help">Leading zeros are preserved.</p><p className="mt-1 min-h-5 text-sm text-red-700" id="history-student-id-error" role={touched && !validStudentId ? "alert" : undefined}>{touched && !validStudentId ? "Enter exactly 17 ASCII digits." : ""}</p></div><Button className="sm:mt-7" disabled={!validStudentId || history.isLoading} type="submit">{history.isLoading ? "Loading history…" : "View reservations"}</Button></form>
         {history.studentId ? <button className="mt-2 text-sm font-semibold text-blue-800 underline underline-offset-4" onClick={switchStudent} type="button">Use another Student ID</button> : null}
       </section>
       <section aria-labelledby="reservation-history-title">

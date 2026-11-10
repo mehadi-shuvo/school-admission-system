@@ -38,6 +38,7 @@ export function DashboardPage() {
   }
 
   const displayError = error ? toDisplayError(error, "classes") : null;
+  const isInitialError = Boolean(displayError && classes.length === 0);
   const hasActiveFilter = Boolean(searchTerm.trim()) || availableOnly;
 
   return (
@@ -61,10 +62,11 @@ export function DashboardPage() {
           </div>
           <div aria-live="polite" className="mt-6">
             {isLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"><LoadingState label="Loading classes" /></div> : null}
-            {displayError ? <div className="space-y-3"><ErrorState description={displayError.description} title={displayError.title} /><Button onClick={() => void refresh()}>Retry</Button></div> : null}
-            {!isLoading && !displayError && classes.length === 0 ? <EmptyState title="No classes are available" description="The admission service has not returned any classes yet. Please check again later." /> : null}
-            {!isLoading && !displayError && classes.length > 0 && filteredClasses.length === 0 ? <EmptyState title="No classes match your search" description={hasActiveFilter ? "Try changing the search text or removing the availability filter." : "No matching classes were found."} /> : null}
-            {!isLoading && !displayError && filteredClasses.length > 0 ? <div className="grid gap-5 md:grid-cols-2">{filteredClasses.map((admissionClass) => <ClassCard admissionClass={admissionClass} key={admissionClass.id} onInspect={setSelectedClass} />)}</div> : null}
+            {isInitialError ? <div className="space-y-3"><ErrorState description={displayError!.description} title={displayError!.title} /><Button onClick={() => void refresh()}>Retry</Button></div> : null}
+            {displayError && !isInitialError ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="status"><span>Showing the last known seat availability. It could not be refreshed.</span><button className="font-semibold text-blue-800 underline underline-offset-4" onClick={() => void refresh()} type="button">Retry refresh</button></div> : null}
+            {!isLoading && !isInitialError && classes.length === 0 ? <EmptyState title="No classes are available" description="The admission service has not returned any classes yet. Please check again later." /> : null}
+            {!isLoading && !isInitialError && classes.length > 0 && filteredClasses.length === 0 ? <EmptyState title="No classes match your search" description={hasActiveFilter ? "Try changing the search text or removing the availability filter." : "No matching classes were found."} /> : null}
+            {!isLoading && !isInitialError && filteredClasses.length > 0 ? <div className="grid gap-5 md:grid-cols-2">{filteredClasses.map((admissionClass) => <ClassCard admissionClass={admissionClass} key={admissionClass.id} onInspect={setSelectedClass} />)}</div> : null}
           </div>
         </section>
         {selectedClass ? <ClassDetailsPanel admissionClass={details.admissionClass} error={details.error} fallbackClass={selectedClass} isLoading={details.isLoading} onClose={() => setSelectedClass(null)} onHoldCreated={handleHoldCreated} onRefresh={() => void details.refresh()} /> : <aside className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-6 text-slate-600 lg:sticky lg:top-6">Select a class to review its latest seat counts and reserve a temporary seat.</aside>}

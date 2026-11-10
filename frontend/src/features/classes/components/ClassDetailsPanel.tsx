@@ -45,7 +45,7 @@ export function ClassDetailsPanel({ fallbackClass, admissionClass, isLoading, er
       <div className="mt-6 border-t border-slate-100 pt-5">
         <h3 className="text-base font-semibold text-slate-950">Reserve a temporary seat</h3>
         <p className="mt-1 text-sm leading-6 text-slate-600">The admission service makes the final availability decision when you submit.</p>
-        {displayError ? <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">Refresh class details before requesting a reservation.</p> : !availability.isReservable ? <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">This class currently has no reservable seats.</p> : <div className="mt-4"><HoldForm admissionClass={currentClass} onHoldCreated={(hold) => onHoldCreated(hold, currentClass.name)} onRefreshAvailability={onRefresh} /></div>}
+        {displayError && !admissionClass ? <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">Refresh class details before requesting a reservation.</p> : !availability.isReservable ? <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">This class currently has no reservable seats.</p> : <div className="mt-4"><HoldForm admissionClass={currentClass} onHoldCreated={(hold) => onHoldCreated(hold, currentClass.name)} onRefreshAvailability={onRefresh} /></div>}
       </div>
     </aside>
   );
