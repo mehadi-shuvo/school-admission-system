@@ -1,0 +1,98 @@
+services:
+  bonus-db:
+    image: postgres:17.4-alpine
+    environment:
+      POSTGRES_DB: school_admission_bonus
+      POSTGRES_USER: school_admission_bonus
+      POSTGRES_PASSWORD: bonus-disposable-password
+    volumes:
+      - bonus-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    networks:
+      - bonus-internal
+
+  bonus-migrate:
+    build:
+      context: .
+      dockerfile: backend/SchoolAdmission.Api/Dockerfile
+    command: ["--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      HOLD_DURATION_SECONDS: "15"
+      HOLD_EXPIRY_SCAN_INTERVAL_SECONDS: "1"
+      ConnectionStrings__AdmissionDb: Host=bonus-db;Port=5432;Database=school_admission_bonus;Username=school_admission_bonus;Password=bonus-disposable-password
+    depends_on:
+      bonus-db:
+        condition: service_healthy
+    networks:
+      - bonus-internal
+    restart: "no"
+
+  bonus-backend-a:
+    build:
+      context: .
+      dockerfile: backend/SchoolAdmission.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      HOLD_DURATION_SECONDS: "15"
+      HOLD_EXPIRY_SCAN_INTERVAL_SECONDS: "1"
+      ConnectionStrings__AdmissionDb: Host=bonus-db;Port=5432;Database=school_admission_bonus;Username=school_admission_bonus;Password=bonus-disposable-password
+    depends_on:
+      bonus-migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8081:8080"
+    networks:
+      - bonus-application
+      - bonus-internal
+    init: true
+
+  bonus-backend-b:
+    build:
+      context: .
+      dockerfile: backend/SchoolAdmission.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      HOLD_DURATION_SECONDS: "15"
+      HOLD_EXPIRY_SCAN_INTERVAL_SECONDS: "1"
+      ConnectionStrings__AdmissionDb: Host=bonus-db;Port=5432;Database=school_admission_bonus;Username=school_admission_bonus;Password=bonus-disposable-password
+    depends_on:
+      bonus-migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8082:8080"
+    networks:
+      - bonus-application
+      - bonus-internal
+    init: true
+
+  bonus-verifier:
+    build:
+      context: .
+      dockerfile: tests/SchoolAdmission.Api.Tests/Dockerfile.bonus
+    environment:
+      BONUS_BACKEND_A_URL: http://bonus-backend-a:8080
+      BONUS_BACKEND_B_URL: http://bonus-backend-b:8080
+      BONUS_DATABASE_CONNECTION: Host=bonus-db;Port=5432;Database=school_admission_bonus;Username=school_admission_bonus;Password=bonus-disposable-password
+    depends_on:
+      bonus-backend-a:
+        condition: service_started
+      bonus-backend-b:
+        condition: service_started
+    networks:
+      - bonus-application
+      - bonus-internal
+    restart: "no"
+
+volumes:
+  bonus-postgres-data:
+
+networks:
+  bonus-application:
+  bonus-internal:
+    internal: true

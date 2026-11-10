@@ -1,0 +1,12 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0.403-noble
+WORKDIR /src
+
+COPY backend/SchoolAdmission.Api/SchoolAdmission.Api.csproj backend/SchoolAdmission.Api/
+COPY tests/SchoolAdmission.Api.Tests/SchoolAdmission.Api.Tests.csproj tests/SchoolAdmission.Api.Tests/
+RUN dotnet restore tests/SchoolAdmission.Api.Tests/SchoolAdmission.Api.Tests.csproj
+
+COPY backend/SchoolAdmission.Api/ backend/SchoolAdmission.Api/
+COPY tests/SchoolAdmission.Api.Tests/ tests/SchoolAdmission.Api.Tests/
+RUN dotnet build tests/SchoolAdmission.Api.Tests/SchoolAdmission.Api.Tests.csproj --configuration Release --no-restore
+
+ENTRYPOINT ["dotnet", "test", "tests/SchoolAdmission.Api.Tests/SchoolAdmission.Api.Tests.csproj", "--configuration", "Release", "--no-build", "--no-restore", "--filter", "FullyQualifiedName~BonusMultiProcessTests"]

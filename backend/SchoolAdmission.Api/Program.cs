@@ -9,18 +9,18 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
-var holdDuration = builder.Configuration["HOLD_DURATION_SECONDS"];
-var holdDurationSeconds = 600;
-
-if (holdDuration is not null &&
-    (!int.TryParse(holdDuration, out holdDurationSeconds) ||
-        holdDurationSeconds <= 0))
-{
-    throw new InvalidOperationException(
-        "HOLD_DURATION_SECONDS must be a positive integer.");
-}
+var holdDurationSeconds = GetPositiveIntegerSetting(
+    builder.Configuration,
+    "HOLD_DURATION_SECONDS",
+    600);
+var expiryScanIntervalSeconds = GetPositiveIntegerSetting(
+    builder.Configuration,
+    "HOLD_EXPIRY_SCAN_INTERVAL_SECONDS",
+    30);
 builder.Services.AddSingleton(new HoldSettings(
     TimeSpan.FromSeconds(holdDurationSeconds)));
+builder.Services.AddSingleton(new HoldExpirySettings(
+    TimeSpan.FromSeconds(expiryScanIntervalSeconds)));
 builder.Services.AddDbContext<AdmissionDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("AdmissionDb");
@@ -35,6 +35,10 @@ builder.Services.AddDbContext<AdmissionDbContext>(options =>
 });
 builder.Services.AddScoped<IClassService, ClassService>();
 builder.Services.AddScoped<ISeatHoldService, SeatHoldService>();
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddHostedService<HoldExpiryBackgroundService>();
+}
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AdmissionDbContext>("database");
 
@@ -69,6 +73,26 @@ app.MapControllers();
 app.MapHealthChecks("/health");
 
 app.Run();
+
+static int GetPositiveIntegerSetting(
+    IConfiguration configuration,
+    string name,
+    int defaultValue)
+{
+    var configuredValue = configuration[name];
+
+    if (configuredValue is null)
+    {
+        return defaultValue;
+    }
+
+    if (!int.TryParse(configuredValue, out var value) || value <= 0)
+    {
+        throw new InvalidOperationException($"{name} must be a positive integer.");
+    }
+
+    return value;
+}
 
 public partial class Program
 {
