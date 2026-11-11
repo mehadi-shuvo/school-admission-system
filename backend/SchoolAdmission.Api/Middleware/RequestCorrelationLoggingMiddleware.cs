@@ -19,6 +19,11 @@ public sealed class RequestCorrelationLoggingMiddleware
     {
         var correlationId = GetCorrelationId(context.Request.Headers);
         context.Response.Headers[CorrelationIdHeaderName] = correlationId;
+        context.Response.OnStarting(() =>
+        {
+            context.Response.Headers[CorrelationIdHeaderName] = correlationId;
+            return Task.CompletedTask;
+        });
 
         using (logger.BeginScope(new Dictionary<string, object?>
         {
