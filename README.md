@@ -229,7 +229,7 @@ Additional usability features include:
 
 - Class seat counts refresh approximately **every five seconds** without a page reload.
 - Expired holds update in the UI and no longer offer a valid Pay action.
-- Student identification is retained across browser refresh/reopen using the existing frontend persistence mechanism.
+- Students can retrieve application history after refreshing or reopening the browser by re-entering the same 17-digit Birth Registration Number. The Student ID is not stored in browser storage.
 - Friendly messages cover invalid input, full classes, expired holds, and backend/network failures.
 - A React application error boundary provides a bilingual fallback and a Reload action for unexpected rendering failures.
 - The admin page includes backend/database readiness information.
