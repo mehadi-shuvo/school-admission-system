@@ -7,6 +7,13 @@ const styles: Record<HoldStatus, string> = {
   EXPIRED: "bg-amber-50 text-amber-900"
 };
 
+const labels: Record<HoldStatus, string> = {
+  HELD: "Reserved",
+  CONFIRMED: "Confirmed",
+  CANCELLED: "Cancelled",
+  EXPIRED: "Expired"
+};
+
 export function HoldStatusBadge({ status }: { status: HoldStatus }) {
-  return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${styles[status]}`}>{status}</span>;
+  return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${styles[status]}`}>{labels[status]}</span>;
 }

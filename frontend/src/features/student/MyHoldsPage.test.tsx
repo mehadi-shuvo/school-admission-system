@@ -37,8 +37,8 @@ function renderPage() {
 }
 
 async function loadHistory(user: ReturnType<typeof userEvent.setup>, id = studentId) {
-  await user.type(screen.getByLabelText("Student ID"), id);
-  await user.click(screen.getByRole("button", { name: "View reservations" }));
+  await user.type(screen.getByLabelText("Birth Registration Number"), id);
+  await user.click(screen.getByRole("button", { name: "View Applications" }));
 }
 
 describe("My Holds workflow", () => {
@@ -53,10 +53,10 @@ describe("My Holds workflow", () => {
   it("rejects invalid Student IDs without fetching history", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.type(screen.getByLabelText("Student ID"), "123");
+    await user.type(screen.getByLabelText("Birth Registration Number"), "123");
     await user.tab();
-    expect(screen.getByRole("alert")).toHaveTextContent("exactly 17 ASCII digits");
-    expect(screen.getByRole("button", { name: "View reservations" })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent("ঠিক ১৭টি ইংরেজি সংখ্যা লিখুন");
+    expect(screen.getByRole("button", { name: "View Applications" })).toBeDisabled();
     expect(getStudentHolds).not.toHaveBeenCalled();
   });
 
@@ -65,10 +65,10 @@ describe("My Holds workflow", () => {
     renderPage();
     await loadHistory(user);
     expect(await screen.findByRole("heading", { name: "Class 6 Morning" })).toBeInTheDocument();
-    expect(screen.getByText("HELD")).toBeInTheDocument();
-    expect(screen.getByText("CONFIRMED")).toBeInTheDocument();
-    expect(screen.getByText("CANCELLED")).toBeInTheDocument();
-    expect(screen.getByText("EXPIRED")).toBeInTheDocument();
+    expect(screen.getByText("Reserved")).toBeInTheDocument();
+    expect(screen.getAllByText("Confirmed").length).toBeGreaterThan(0);
+    expect(screen.getByText("Cancelled")).toBeInTheDocument();
+    expect(screen.getByText("Expired")).toBeInTheDocument();
     expect(getStudentHolds).toHaveBeenCalledWith(studentId, expect.any(AbortSignal));
   });
 
@@ -78,9 +78,9 @@ describe("My Holds workflow", () => {
     getStudentHolds.mockReturnValueOnce(new Promise<StudentHold[]>((resolve) => { resolveHistory = resolve; }));
     renderPage();
     await loadHistory(user);
-    expect(screen.getByRole("status", { name: "Loading reservation history" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "আবেদনের তথ্য লোড হচ্ছে" })).toBeInTheDocument();
     resolveHistory([]);
-    expect(await screen.findByRole("heading", { name: "No reservations found" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "কোনো আবেদন পাওয়া যায়নি" })).toBeInTheDocument();
   });
 
   it("shows an API error and retries", async () => {
@@ -88,9 +88,9 @@ describe("My Holds workflow", () => {
     getStudentHolds.mockRejectedValueOnce(new ApiError("offline", 0)).mockResolvedValueOnce([]);
     renderPage();
     await loadHistory(user);
-    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load reservation history");
-    await user.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByRole("heading", { name: "No reservations found" })).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("আবেদনের তালিকা লোড করা যাচ্ছে না");
+    await user.click(screen.getByRole("button", { name: "আবার চেষ্টা করুন" }));
+    expect(await screen.findByRole("heading", { name: "কোনো আবেদন পাওয়া যায়নি" })).toBeInTheDocument();
     expect(getStudentHolds).toHaveBeenCalledTimes(2);
   });
 
@@ -102,12 +102,12 @@ describe("My Holds workflow", () => {
     const confirmedCard = screen.getByRole("heading", { name: "Class 6 Afternoon" }).closest("article");
     const cancelledCard = screen.getByRole("heading", { name: "Class 7 Morning" }).closest("article");
     const expiredCard = screen.getByRole("heading", { name: "Class 7 Afternoon" }).closest("article");
-    expect(heldCard).toHaveTextContent("Pay admission fee (demo) & confirm");
-    expect(heldCard).toHaveTextContent("Cancel hold");
-    expect(confirmedCard).not.toHaveTextContent("Cancel hold");
-    expect(confirmedCard).not.toHaveTextContent("Time remaining");
-    expect(cancelledCard).not.toHaveTextContent("Pay admission fee (demo) & confirm");
-    expect(expiredCard).not.toHaveTextContent("Cancel hold");
+    expect(heldCard).toHaveTextContent("Confirm Admission");
+    expect(heldCard).toHaveTextContent("Cancel Reservation");
+    expect(confirmedCard).not.toHaveTextContent("Cancel Reservation");
+    expect(confirmedCard).not.toHaveTextContent("বাকি সময়");
+    expect(cancelledCard).not.toHaveTextContent("Confirm Admission");
+    expect(expiredCard).not.toHaveTextContent("Cancel Reservation");
   });
 
   it("confirms a held reservation and refreshes history", async () => {
@@ -115,10 +115,28 @@ describe("My Holds workflow", () => {
     getStudentHolds.mockResolvedValueOnce([holds[0]]).mockResolvedValueOnce([{ ...holds[0], status: "CONFIRMED" }]);
     renderPage();
     await loadHistory(user);
-    await user.click(screen.getByRole("button", { name: "Pay admission fee (demo) & confirm" }));
-    expect(await screen.findByText("CONFIRMED")).toBeInTheDocument();
-    expect(confirmHold).toHaveBeenCalledWith("h_held", studentId);
+    await user.click(screen.getByRole("button", { name: "Confirm Admission" }));
+    expect(await screen.findByText("Admission Confirmed")).toBeInTheDocument();
+    expect(confirmHold).toHaveBeenCalledWith("h_held", studentId, expect.any(AbortSignal));
     await waitFor(() => expect(getStudentHolds).toHaveBeenCalledTimes(2));
+  });
+
+  it("shows payment processing and a Bengali failure state without duplicate submission", async () => {
+    const user = userEvent.setup();
+    let rejectConfirmation: (reason: unknown) => void = () => undefined;
+    confirmHold.mockReturnValueOnce(new Promise((_, reject) => { rejectConfirmation = reject; }));
+    getStudentHolds.mockResolvedValueOnce([holds[0]]);
+    renderPage();
+    await loadHistory(user);
+    const confirmButton = screen.getByRole("button", { name: "Confirm Admission" });
+    await user.click(confirmButton);
+    expect(screen.getByRole("button", { name: "Processing your admission..." })).toBeDisabled();
+    expect(screen.getByText("অনুগ্রহ করে অপেক্ষা করুন")).toBeInTheDocument();
+    await user.click(confirmButton);
+    expect(confirmHold).toHaveBeenCalledTimes(1);
+    rejectConfirmation(new ApiError("failed", 500));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to confirm admission. Please try again.");
+    expect(screen.getByRole("button", { name: "Confirm Admission" })).toBeEnabled();
   });
 
   it("requires an inline confirmation and cancels without reading a body", async () => {
@@ -126,11 +144,11 @@ describe("My Holds workflow", () => {
     getStudentHolds.mockResolvedValueOnce([holds[0]]).mockResolvedValueOnce([{ ...holds[0], status: "CANCELLED" }]);
     renderPage();
     await loadHistory(user);
-    await user.click(screen.getByRole("button", { name: "Cancel hold" }));
-    expect(screen.getByText("Cancel this temporary hold?")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Yes, cancel hold" }));
-    expect(await screen.findByText("CANCELLED")).toBeInTheDocument();
-    expect(cancelHold).toHaveBeenCalledWith("h_held", studentId);
+    await user.click(screen.getByRole("button", { name: "Cancel Reservation" }));
+    expect(screen.getByText("সাময়িক সংরক্ষণ বাতিল করবেন?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Yes, Cancel Reservation" }));
+    expect(await screen.findByText("Cancelled")).toBeInTheDocument();
+    expect(cancelHold).toHaveBeenCalledWith("h_held", studentId, expect.any(AbortSignal));
   });
 
   it("refreshes after confirmation and cancellation conflicts", async () => {
@@ -139,8 +157,8 @@ describe("My Holds workflow", () => {
     getStudentHolds.mockResolvedValueOnce([holds[0]]).mockResolvedValueOnce([{ ...holds[0], status: "EXPIRED" }]);
     renderPage();
     await loadHistory(user);
-    await user.click(screen.getByRole("button", { name: "Pay admission fee (demo) & confirm" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("can no longer be confirmed");
+    await user.click(screen.getByRole("button", { name: "Confirm Admission" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to confirm admission. Please try again.");
     await waitFor(() => expect(getStudentHolds).toHaveBeenCalledTimes(2));
   });
 
@@ -150,9 +168,9 @@ describe("My Holds workflow", () => {
     getStudentHolds.mockResolvedValueOnce([holds[0]]).mockResolvedValueOnce([{ ...holds[0], status: "CONFIRMED" }]);
     renderPage();
     await loadHistory(user);
-    await user.click(screen.getByRole("button", { name: "Cancel hold" }));
-    await user.click(screen.getByRole("button", { name: "Yes, cancel hold" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("can no longer be cancelled");
+    await user.click(screen.getByRole("button", { name: "Cancel Reservation" }));
+    await user.click(screen.getByRole("button", { name: "Yes, Cancel Reservation" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("এই সংরক্ষণ বাতিল করা যাবে না");
     await waitFor(() => expect(getStudentHolds).toHaveBeenCalledTimes(2));
   });
 
@@ -162,10 +180,10 @@ describe("My Holds workflow", () => {
     getStudentHolds.mockResolvedValueOnce([holds[0]]);
     renderPage();
     await loadHistory(user);
-    await user.click(screen.getByRole("button", { name: "Pay admission fee (demo) & confirm" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("may have succeeded");
+    await user.click(screen.getByRole("button", { name: "Confirm Admission" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to confirm admission. Please try again.");
     expect(confirmHold).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "Refresh status" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check latest status" })).toBeInTheDocument();
   });
 
   it("prevents duplicate lifecycle clicks while pending", async () => {
@@ -175,12 +193,12 @@ describe("My Holds workflow", () => {
     getStudentHolds.mockResolvedValueOnce([holds[0]]).mockResolvedValueOnce([{ ...holds[0], status: "CONFIRMED" }]);
     renderPage();
     await loadHistory(user);
-    const confirmButton = screen.getByRole("button", { name: "Pay admission fee (demo) & confirm" });
+    const confirmButton = screen.getByRole("button", { name: "Confirm Admission" });
     await user.click(confirmButton);
     await user.click(confirmButton);
     expect(confirmHold).toHaveBeenCalledTimes(1);
     resolveConfirm({ holdId: "h_held", status: "CONFIRMED" });
-    expect(await screen.findByText("CONFIRMED")).toBeInTheDocument();
+    expect(await screen.findByText("Admission Confirmed")).toBeInTheDocument();
   });
 
   it("does not let a stale Student ID response overwrite a newer lookup", async () => {
@@ -190,9 +208,9 @@ describe("My Holds workflow", () => {
     getStudentHolds.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; })).mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
     renderPage();
     await loadHistory(user, studentId);
-    await user.clear(screen.getByLabelText("Student ID"));
-    await user.type(screen.getByLabelText("Student ID"), "10123456789012345");
-    await user.click(screen.getByRole("button", { name: "View reservations" }));
+    await user.clear(screen.getByLabelText("Birth Registration Number"));
+    await user.type(screen.getByLabelText("Birth Registration Number"), "10123456789012345");
+    await user.click(screen.getByRole("button", { name: "View Applications" }));
     resolveSecond([{ ...holds[0], className: "Student B Class" }]);
     expect(await screen.findByRole("heading", { name: "Student B Class" })).toBeInTheDocument();
     resolveFirst([{ ...holds[0], className: "Student A Class" }]);

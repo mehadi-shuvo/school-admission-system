@@ -11,14 +11,14 @@ async function createClass(request: APIRequestContext, totalSeats = 3) {
 }
 
 async function reserveFromBrowser(page: Page, className: string, studentId: string) {
-  await page.getByRole("searchbox", { name: "Search classes" }).fill(className);
+  await page.getByRole("searchbox", { name: "Search Classes" }).fill(className);
   await page.getByRole("heading", { name: className }).waitFor();
-  await page.getByRole("button", { name: "Reserve seat" }).click();
+  await page.getByRole("button", { name: "Apply Now" }).click();
   await page.locator("#student-id").fill(studentId);
   const responsePromise = page.waitForResponse((response) => response.url().includes("/holds") && response.request().method() === "POST" && response.status() === 201);
-  await page.getByRole("button", { name: "Reserve temporary seat" }).click();
+  await page.getByRole("button", { name: "Reserve Seat" }).click();
   await responsePromise;
-  await expect(page.getByRole("heading", { name: "Seat temporarily reserved" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Seat Reserved" })).toBeVisible();
 }
 
 test("class discovery uses the real same-origin API proxy", async ({ page, request }) => {
@@ -26,10 +26,10 @@ test("class discovery uses the real same-origin API proxy", async ({ page, reque
   await page.goto("/");
   await expect(page.getByRole("heading", { name: admissionClass.name }).first()).toBeVisible();
   await expect(page.getByText("3", { exact: true }).first()).toBeVisible();
-  await page.getByRole("searchbox", { name: "Search classes" }).fill(admissionClass.name);
+  await page.getByRole("searchbox", { name: "Search Classes" }).fill(admissionClass.name);
   await expect(page.getByRole("heading", { name: admissionClass.name })).toBeVisible();
-  await page.getByRole("checkbox", { name: "Available only" }).check();
-  await page.getByRole("button", { name: "Details" }).click();
+  await page.getByRole("checkbox", { name: "Available seats only" }).check();
+  await page.getByRole("button", { name: "View Details" }).click();
   await expect(page.getByRole("heading", { name: admissionClass.name }).last()).toBeVisible();
   const details = await request.get(`/api/classes/${admissionClass.id}`);
   expect(details.status()).toBe(200);
@@ -38,28 +38,28 @@ test("class discovery uses the real same-origin API proxy", async ({ page, reque
 test("school admin creates a class and it appears in discovery", async ({ page }) => {
   const name = `Admin Class ${unique()}`;
   await page.goto("/admin/classes");
-  await expect(page.getByRole("heading", { name: "Manage classes" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Class Management" })).toBeVisible();
   await page.locator("#class-name").fill(`  ${name}  `);
   await page.locator("#total-seats").fill("12");
   const responsePromise = page.waitForResponse((response) => response.url().endsWith("/api/classes") && response.request().method() === "POST" && response.status() === 201);
-  await page.getByRole("button", { name: "Create class" }).click();
+  await page.getByRole("button", { name: "Save Class" }).click();
   await responsePromise;
   await expect(page.getByRole("status")).toContainText(name);
-  await page.getByRole("link", { name: "View classes" }).click();
+  await page.getByRole("link", { name: "Explore Classes" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
 });
 
 test("class availability refreshes without reloading the page", async ({ page, request }) => {
   const admissionClass = await createClass(request, 2);
   await page.goto("/");
-  await page.getByRole("searchbox", { name: "Search classes" }).fill(admissionClass.name);
+  await page.getByRole("searchbox", { name: "Search Classes" }).fill(admissionClass.name);
   const card = page.getByRole("heading", { name: admissionClass.name }).locator("..").locator("..");
-  const availableSeats = card.locator("p.text-2xl");
+  const availableSeats = card.locator("[aria-label^='Available Seats:']");
   await expect(availableSeats).toHaveText("2");
   const created = await request.post(`/api/classes/${admissionClass.id}/holds`, { headers: { "X-Student-Id": student("10") } });
   expect(created.status()).toBe(201);
   await expect(availableSeats).toHaveText("1", { timeout: 8_000 });
-  await expect(page.getByRole("searchbox", { name: "Search classes" })).toHaveValue(admissionClass.name);
+  await expect(page.getByRole("searchbox", { name: "Search Classes" })).toHaveValue(admissionClass.name);
 });
 
 test("creates and confirms a hold through Chromium", async ({ page, request }) => {
@@ -67,19 +67,19 @@ test("creates and confirms a hold through Chromium", async ({ page, request }) =
   const studentId = student("1");
   await page.goto("/");
   await reserveFromBrowser(page, admissionClass.name, studentId);
-  await expect(page.getByText("HELD", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Reserved", { exact: true }).first()).toBeVisible();
   const holdId = await page.locator("dd.font-mono").first().textContent();
   expect(holdId).toBeTruthy();
   const afterCreate = await request.get(`/api/classes/${admissionClass.id}`);
   expect((await afterCreate.json() as { availableSeats: number }).availableSeats).toBe(1);
-  await page.getByRole("link", { name: "Manage reservation" }).click();
+  await page.getByRole("link", { name: "My Applications" }).click();
   await expect(page.getByRole("heading", { name: admissionClass.name }).first()).toBeVisible();
-  await expect(page.getByText(/remaining/).first()).toBeVisible();
+  await expect(page.getByText(/বাকি/).first()).toBeVisible();
   const confirmResponse = page.waitForResponse((response) => response.url().includes("/confirm") && response.request().method() === "POST" && response.status() === 200);
-  await page.getByRole("button", { name: "Pay admission fee (demo) & confirm" }).click();
+  await page.getByRole("button", { name: "Confirm Admission" }).click();
   await confirmResponse;
-  await expect(page.getByText("CONFIRMED", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Pay admission fee (demo) & confirm" })).toHaveCount(0);
+  await expect(page.getByText("Admission Confirmed", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Confirm Admission" })).toHaveCount(0);
   const hold = await request.get(`/api/holds/${holdId}`);
   expect((await hold.json() as { status: string }).status).toBe("CONFIRMED");
 });
@@ -89,12 +89,12 @@ test("cancels a hold and returns its seat", async ({ page, request }) => {
   const studentId = student("2");
   await page.goto("/");
   await reserveFromBrowser(page, admissionClass.name, studentId);
-  await page.getByRole("link", { name: "Manage reservation" }).click();
-  await page.getByRole("button", { name: "Cancel hold" }).click();
+  await page.getByRole("link", { name: "My Applications" }).click();
+  await page.getByRole("button", { name: "Cancel Reservation" }).click();
   const cancelResponse = page.waitForResponse((response) => response.request().method() === "DELETE" && response.status() === 204);
-  await page.getByRole("button", { name: "Yes, cancel hold" }).click();
+  await page.getByRole("button", { name: "Yes, Cancel Reservation" }).click();
   await cancelResponse;
-  await expect(page.getByText("CANCELLED", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Cancelled", { exact: true }).first()).toBeVisible();
   const classAfterCancellation = await request.get(`/api/classes/${admissionClass.id}`);
   expect((await classAfterCancellation.json() as { availableSeats: number }).availableSeats).toBe(1);
 });
@@ -105,9 +105,9 @@ test("recovers history after refresh without browser Student ID persistence", as
   await page.goto("/");
   await reserveFromBrowser(page, admissionClass.name, studentId);
   await page.reload();
-  await page.getByRole("link", { name: "My Holds" }).click();
+  await page.getByRole("link", { name: "My Applications" }).click();
   await page.locator("#history-student-id").fill(studentId);
-  await page.getByRole("button", { name: "View reservations" }).click();
+  await page.getByRole("button", { name: "View Applications" }).click();
   await expect(page.getByRole("heading", { name: admissionClass.name })).toBeVisible();
   const browserState = await page.evaluate(() => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage), search: location.search }));
   expect(browserState.local).toEqual([]);
@@ -126,15 +126,15 @@ test("validates full classes and isolates student histories", async ({ page, req
   const fillClass = await request.post(`/api/classes/${fullClass.id}/holds`, { headers: { "X-Student-Id": student("6") } });
   expect(fillClass.status()).toBe(201);
   await page.goto("/");
-  await page.getByRole("searchbox", { name: "Search classes" }).fill(fullClass.name);
-  await expect(page.getByRole("button", { name: "Reserve seat" })).toBeDisabled();
+  await page.getByRole("searchbox", { name: "Search Classes" }).fill(fullClass.name);
+  await expect(page.getByRole("button", { name: "No Seats Available" })).toBeDisabled();
   await reserveFromBrowser(page, classA.name, studentA);
   await page.goto("/");
   await reserveFromBrowser(page, classB.name, studentB);
-  await page.getByRole("link", { name: "Manage reservation" }).click();
-  await page.getByRole("button", { name: "Use another Student ID" }).click();
+  await page.getByRole("link", { name: "My Applications" }).click();
+  await page.getByRole("button", { name: "Use another registration number" }).click();
   await page.locator("#history-student-id").fill(studentA);
-  await page.getByRole("button", { name: "View reservations" }).click();
+  await page.getByRole("button", { name: "View Applications" }).click();
   await expect(page.getByRole("heading", { name: classA.name })).toBeVisible();
   await expect(page.getByRole("heading", { name: classB.name })).toHaveCount(0);
 });
@@ -143,11 +143,11 @@ test("expires a hold in the isolated short-duration environment", async ({ page,
   const admissionClass = await createClass(request, 1);
   await page.goto("/");
   await reserveFromBrowser(page, admissionClass.name, student("7"));
-  await page.getByRole("link", { name: "Manage reservation" }).click();
+  await page.getByRole("link", { name: "My Applications" }).click();
   const holdCard = page.getByRole("heading", { name: admissionClass.name }).locator("..").locator("..");
-  await expect(holdCard.getByText("EXPIRED", { exact: true })).toBeVisible({ timeout: 20_000 });
-  await expect(holdCard.getByRole("button", { name: "Pay admission fee (demo) & confirm" })).toHaveCount(0);
-  await expect(holdCard.getByRole("button", { name: "Cancel hold" })).toHaveCount(0);
+  await expect(holdCard.getByText("Expired", { exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(holdCard.getByRole("button", { name: "Confirm Admission" })).toHaveCount(0);
+  await expect(holdCard.getByRole("button", { name: "Cancel Reservation" })).toHaveCount(0);
   const classAfterExpiry = await request.get(`/api/classes/${admissionClass.id}`);
   expect((await classAfterExpiry.json() as { availableSeats: number }).availableSeats).toBe(1);
 });

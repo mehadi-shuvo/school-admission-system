@@ -11,19 +11,19 @@ describe("application routing", () => {
 
   it("renders the class discovery shell", () => {
     render(<App />);
-    expect(screen.getByRole("heading", { name: "Find the right class" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "আপনার সন্তানের উজ্জ্বল ভবিষ্যৎ শুরু হোক এখানেই" })).toBeInTheDocument();
   });
 
   it("navigates to My Holds", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole("link", { name: "My Holds" }));
-    expect(screen.getByRole("heading", { name: "My reservations" })).toBeInTheDocument();
+    await user.click(screen.getByRole("link", { name: "My Applications" }));
+    expect(screen.getByRole("heading", { level: 1, name: "My Applications" })).toBeInTheDocument();
   });
 
   it("renders a not found page for unknown routes", async () => {
     await router.navigate("/missing");
     render(<App />);
-    expect(screen.getByRole("heading", { name: "Page not found" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "পৃষ্ঠা পাওয়া যায়নি" })).toBeInTheDocument();
   });
 });

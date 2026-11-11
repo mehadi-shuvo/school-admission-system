@@ -6,12 +6,12 @@ export function NotFoundPage() {
   return (
     <Container>
       <main className="py-20 sm:py-28">
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">404</p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-950">Page not found</h1>
-        <p className="mt-3 max-w-lg text-slate-600">The page you requested is not available in the admission portal.</p>
-        <Link className="mt-6 inline-flex items-center gap-2 font-semibold text-blue-700 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-700" to="/">
+        <p className="text-sm font-semibold tracking-[0.16em] text-[#237a67]">৪০৪</p>
+        <h1 className="mt-2 text-3xl font-bold text-[#102a4c]">পৃষ্ঠা পাওয়া যায়নি</h1>
+        <p className="mt-3 max-w-lg text-slate-600">আপনি যে পৃষ্ঠাটি খুঁজছেন, সেটি ভর্তি পোর্টালে পাওয়া যায়নি।</p>
+        <Link className="mt-6 inline-flex items-center gap-2 font-bold text-[#12345b] hover:text-[#0b294e] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#12345b]" to="/">
           <ArrowLeft aria-hidden="true" className="size-4" />
-          Return to classes
+          শ্রেণিসমূহে ফিরে যান
         </Link>
       </main>
     </Container>

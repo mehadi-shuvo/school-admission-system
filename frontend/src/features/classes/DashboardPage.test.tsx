@@ -32,12 +32,12 @@ function renderDashboard() {
 }
 
 async function openReservableClass(user: ReturnType<typeof userEvent.setup>) {
-  const reserveButton = (await screen.findAllByRole("button", { name: /reserve seat/i })).find((button) => !button.hasAttribute("disabled"));
+  const reserveButton = (await screen.findAllByRole("button", { name: "Apply Now" })).find((button) => !button.hasAttribute("disabled"));
   if (!reserveButton) {
     throw new Error("Expected a reservable class card.");
   }
   await user.click(reserveButton);
-  await screen.findByLabelText("Student ID");
+  await screen.findByLabelText("Birth Registration Number");
 }
 
 describe("class discovery and temporary holds", () => {
@@ -50,23 +50,23 @@ describe("class discovery and temporary holds", () => {
 
   it("renders live backend classes and accessible occupancy", async () => {
     renderDashboard();
-    expect(screen.getByRole("status", { name: "Loading classes" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "শ্রেণির তথ্য লোড হচ্ছে" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Class 6 Morning" })).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: /seat occupancy: 50% occupied/i })).toHaveAttribute("aria-valuenow", "50");
+    expect(screen.getByRole("progressbar", { name: /Seat occupancy: 50% occupied/i })).toHaveAttribute("aria-valuenow", "50");
   });
 
   it("distinguishes an empty backend response", async () => {
     listClasses.mockResolvedValueOnce([]);
     renderDashboard();
-    expect(await screen.findByRole("heading", { name: "No classes are available" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "এখনও কোনো শ্রেণি পাওয়া যায়নি" })).toBeInTheDocument();
   });
 
   it("shows a fetch error and retries the class request", async () => {
     const user = userEvent.setup();
     listClasses.mockRejectedValueOnce(new ApiError("offline", 0)).mockResolvedValueOnce(classes);
     renderDashboard();
-    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to reach the admission service");
-    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("ভর্তি সেবার সঙ্গে সংযোগ করা যাচ্ছে না");
+    await user.click(screen.getByRole("button", { name: "আবার চেষ্টা করুন" }));
     expect(await screen.findByRole("heading", { name: "Class 6 Morning" })).toBeInTheDocument();
     expect(listClasses).toHaveBeenCalledTimes(2);
   });
@@ -75,11 +75,11 @@ describe("class discovery and temporary holds", () => {
     const user = userEvent.setup();
     renderDashboard();
     await screen.findByRole("heading", { name: "Class 6 Morning" });
-    await user.type(screen.getByRole("searchbox", { name: "Search classes" }), "evening");
+    await user.type(screen.getByRole("searchbox", { name: "Search Classes" }), "evening");
     expect(screen.queryByRole("heading", { name: "Class 6 Morning" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Class 6 Evening" })).toBeInTheDocument();
-    await user.clear(screen.getByRole("searchbox", { name: "Search classes" }));
-    await user.click(screen.getByRole("checkbox", { name: "Available only" }));
+    await user.clear(screen.getByRole("searchbox", { name: "Search Classes" }));
+    await user.click(screen.getByRole("checkbox", { name: "Available seats only" }));
     expect(screen.queryByRole("heading", { name: "Class 6 Evening" })).not.toBeInTheDocument();
     expect(listClasses).toHaveBeenCalledTimes(1);
   });
@@ -87,7 +87,7 @@ describe("class discovery and temporary holds", () => {
   it("disables reservation for a full class", async () => {
     renderDashboard();
     expect(await screen.findByRole("heading", { name: "Class 6 Evening" })).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /reserve seat/i })[0]).not.toBeDisabled();
+    expect(screen.getAllByRole("button", { name: "Apply Now" })[0]).not.toBeDisabled();
     const fullCard = screen.getByRole("heading", { name: "Class 6 Evening" }).closest("article");
     expect(fullCard).not.toBeNull();
     expect(fullCard?.querySelector("button")).toBeDisabled();
@@ -98,22 +98,22 @@ describe("class discovery and temporary holds", () => {
     renderDashboard();
     await openReservableClass(user);
     expect(getClass).toHaveBeenCalledWith("c_morning", expect.any(AbortSignal));
-    const studentId = screen.getByLabelText("Student ID");
+    const studentId = screen.getByLabelText("Birth Registration Number");
     await user.type(studentId, "123");
     await user.tab();
-    expect(screen.getByRole("alert")).toHaveTextContent("Enter exactly 17 ASCII digits.");
-    expect(screen.getByRole("button", { name: "Reserve temporary seat" })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent("ঠিক ১৭টি ইংরেজি সংখ্যা লিখুন।");
+    expect(screen.getByRole("button", { name: "Reserve Seat" })).toBeDisabled();
   });
 
   it("allows a valid Student ID and displays the returned hold", async () => {
     const user = userEvent.setup();
     renderDashboard();
     await openReservableClass(user);
-    await user.type(screen.getByLabelText("Student ID"), hold.studentId);
-    await user.click(screen.getByRole("button", { name: "Reserve temporary seat" }));
-    expect(await screen.findByRole("heading", { name: "Seat temporarily reserved" })).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Birth Registration Number"), hold.studentId);
+    await user.click(screen.getByRole("button", { name: "Reserve Seat" }));
+    expect(await screen.findByRole("heading", { name: "Seat Reserved" })).toBeInTheDocument();
     expect(screen.getByText(hold.holdId)).toBeInTheDocument();
-    expect(screen.getByText("HELD")).toBeInTheDocument();
+    expect(screen.getAllByText("Reserved").length).toBeGreaterThan(0);
     expect(createHold).toHaveBeenCalledWith("c_morning", hold.studentId);
   });
 
@@ -122,9 +122,9 @@ describe("class discovery and temporary holds", () => {
     createHold.mockRejectedValueOnce(new ApiError("full", 409));
     renderDashboard();
     await openReservableClass(user);
-    await user.type(screen.getByLabelText("Student ID"), hold.studentId);
-    await user.click(screen.getByRole("button", { name: "Reserve temporary seat" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("may now be full");
+    await user.type(screen.getByLabelText("Birth Registration Number"), hold.studentId);
+    await user.click(screen.getByRole("button", { name: "Reserve Seat" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("আসন সংরক্ষণ করা যায়নি");
     await waitFor(() => expect(getClass).toHaveBeenCalledTimes(2));
   });
 
@@ -133,9 +133,9 @@ describe("class discovery and temporary holds", () => {
     createHold.mockRejectedValueOnce(new ApiError("offline", 0));
     renderDashboard();
     await openReservableClass(user);
-    await user.type(screen.getByLabelText("Student ID"), hold.studentId);
-    await user.click(screen.getByRole("button", { name: "Reserve temporary seat" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("do not retry automatically");
+    await user.type(screen.getByLabelText("Birth Registration Number"), hold.studentId);
+    await user.click(screen.getByRole("button", { name: "Reserve Seat" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("স্বয়ংক্রিয়ভাবে আবার চেষ্টা করবেন না");
     expect(createHold).toHaveBeenCalledTimes(1);
   });
 
@@ -145,13 +145,13 @@ describe("class discovery and temporary holds", () => {
     createHold.mockReturnValueOnce(new Promise<HoldCreated>((resolve) => { resolveHold = resolve; }));
     renderDashboard();
     await openReservableClass(user);
-    await user.type(screen.getByLabelText("Student ID"), hold.studentId);
-    const submit = screen.getByRole("button", { name: "Reserve temporary seat" });
+    await user.type(screen.getByLabelText("Birth Registration Number"), hold.studentId);
+    const submit = screen.getByRole("button", { name: "Reserve Seat" });
     await user.click(submit);
     await user.click(submit);
     expect(createHold).toHaveBeenCalledTimes(1);
     resolveHold(hold);
-    expect(await screen.findByRole("heading", { name: "Seat temporarily reserved" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Seat Reserved" })).toBeInTheDocument();
   });
 
   it("refreshes the list after a successful reservation", async () => {
@@ -159,9 +159,9 @@ describe("class discovery and temporary holds", () => {
     listClasses.mockResolvedValueOnce(classes).mockResolvedValueOnce([{ ...classes[0], heldSeats: 3, availableSeats: 9 }, classes[1]]);
     renderDashboard();
     await openReservableClass(user);
-    await user.type(screen.getByLabelText("Student ID"), hold.studentId);
-    await user.click(screen.getByRole("button", { name: "Reserve temporary seat" }));
-    await screen.findByRole("heading", { name: "Seat temporarily reserved" });
+    await user.type(screen.getByLabelText("Birth Registration Number"), hold.studentId);
+    await user.click(screen.getByRole("button", { name: "Reserve Seat" }));
+    await screen.findByRole("heading", { name: "Seat Reserved" });
     await waitFor(() => expect(listClasses).toHaveBeenCalledTimes(2));
     expect(await screen.findByText("9", { selector: "p" })).toBeInTheDocument();
   });

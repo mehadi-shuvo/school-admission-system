@@ -20,12 +20,12 @@ describe("admin class creation", () => {
   it("renders and validates the required class name and whole-number seats", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole("button", { name: "Create class" }));
-    expect(screen.getByText("Class/shift name is required.")).toBeInTheDocument();
-    expect(screen.getByText("Total seats must be a positive whole number.")).toBeInTheDocument();
-    await user.type(screen.getByLabelText("Class/shift name"), "Class 6");
-    await user.type(screen.getByLabelText("Total seats"), "2.5");
-    await user.click(screen.getByRole("button", { name: "Create class" }));
+    await user.click(screen.getByRole("button", { name: "Save Class" }));
+    expect(screen.getByText("শ্রেণির নাম লিখুন।")).toBeInTheDocument();
+    expect(screen.getByText("মোট আসনসংখ্যা ধনাত্মক পূর্ণসংখ্যা হতে হবে।")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Class Name"), "Class 6");
+    await user.type(screen.getByLabelText("Total Seats"), "2.5");
+    await user.click(screen.getByRole("button", { name: "Save Class" }));
     expect(createClass).not.toHaveBeenCalled();
   });
 
@@ -33,9 +33,9 @@ describe("admin class creation", () => {
     const user = userEvent.setup();
     createClass.mockResolvedValue({ id: "c_1", name: "Class 6 Morning", totalSeats: 120 });
     renderPage();
-    await user.type(screen.getByLabelText("Class/shift name"), "  Class 6   Morning ");
-    await user.type(screen.getByLabelText("Total seats"), "120");
-    await user.click(screen.getByRole("button", { name: "Create class" }));
+    await user.type(screen.getByLabelText("Class Name"), "  Class 6   Morning ");
+    await user.type(screen.getByLabelText("Total Seats"), "120");
+    await user.click(screen.getByRole("button", { name: "Save Class" }));
     expect(await screen.findByRole("status")).toHaveTextContent("Class 6 Morning");
     expect(createClass).toHaveBeenCalledWith({ name: "Class 6 Morning", totalSeats: 120 });
   });
@@ -45,14 +45,14 @@ describe("admin class creation", () => {
     let rejectRequest: (reason: unknown) => void = () => undefined;
     createClass.mockReturnValueOnce(new Promise((_, reject) => { rejectRequest = reject; }));
     renderPage();
-    await user.type(screen.getByLabelText("Class/shift name"), "Class 6");
-    await user.type(screen.getByLabelText("Total seats"), "30");
-    const submit = screen.getByRole("button", { name: "Create class" });
+    await user.type(screen.getByLabelText("Class Name"), "Class 6");
+    await user.type(screen.getByLabelText("Total Seats"), "30");
+    const submit = screen.getByRole("button", { name: "Save Class" });
     await user.click(submit);
     await user.click(submit);
     expect(createClass).toHaveBeenCalledTimes(1);
     rejectRequest(new ApiError("offline", 0));
-    expect(await screen.findByRole("alert")).toHaveTextContent("may have been created");
+    expect(await screen.findByRole("alert")).toHaveTextContent("শ্রেণিটি তৈরি হয়েছে কি না তালিকায় দেখে নিন");
     expect(createClass).toHaveBeenCalledTimes(1);
   });
 });

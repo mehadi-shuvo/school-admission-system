@@ -10,18 +10,18 @@ export interface HoldDisplayError {
 export function toHoldDisplayError(error: unknown, operation: "history" | "confirm" | "cancel"): HoldDisplayError {
   if (error instanceof ApiError) {
     if (error.status === 400) {
-      return { title: "Please check the request", description: "The admission service could not accept this request. Check the Student ID and try again.", isNetworkError: false, shouldRefresh: false };
+      return { title: "অনুরোধের তথ্য যাচাই করুন", description: "ভর্তি সেবা অনুরোধটি গ্রহণ করতে পারেনি। শিক্ষার্থী আইডি দেখে আবার চেষ্টা করুন।", isNetworkError: false, shouldRefresh: false };
     }
     if (error.status === 403) {
-      return { title: "This reservation belongs to another student", description: "The Student ID entered does not own this reservation.", isNetworkError: false, shouldRefresh: false };
+      return { title: "এই সংরক্ষণটি অন্য শিক্ষার্থীর", description: "দেওয়া শিক্ষার্থী আইডিটি এই সংরক্ষণের মালিক নয়।", isNetworkError: false, shouldRefresh: false };
     }
     if (error.status === 404) {
-      return { title: "Reservation not found", description: "This reservation may no longer exist. Refresh your history to reconcile it.", isNetworkError: false, shouldRefresh: true };
+      return { title: "সংরক্ষণের তথ্য পাওয়া যায়নি", description: "এই সংরক্ষণটি আর নাও থাকতে পারে। সর্বশেষ অবস্থা দেখতে তালিকা হালনাগাদ করুন।", isNetworkError: false, shouldRefresh: true };
     }
     if (error.status === 409) {
       return {
-        title: operation === "confirm" ? "This hold can no longer be confirmed" : "This hold can no longer be cancelled",
-        description: operation === "confirm" ? "The hold may have expired or been cancelled. Refresh your history to see the server status." : "The hold may have expired or been confirmed. Refresh your history to see the server status.",
+        title: operation === "confirm" ? "এই সংরক্ষণে ভর্তি নিশ্চিত করা যাবে না" : "এই সংরক্ষণ বাতিল করা যাবে না",
+        description: operation === "confirm" ? "সংরক্ষণের সময় শেষ বা এটি বাতিল হয়ে থাকতে পারে। সর্বশেষ অবস্থা দেখতে তালিকা হালনাগাদ করুন।" : "সংরক্ষণের সময় শেষ বা ভর্তি নিশ্চিত হয়ে থাকতে পারে। সর্বশেষ অবস্থা দেখতে তালিকা হালনাগাদ করুন।",
         isNetworkError: false,
         shouldRefresh: true
       };
@@ -29,8 +29,8 @@ export function toHoldDisplayError(error: unknown, operation: "history" | "confi
   }
 
   return {
-    title: operation === "history" ? "Unable to load reservation history" : "We could not verify the result",
-    description: operation === "history" ? "Check your connection and try again." : "The connection was lost after the request was sent, so it may have succeeded. Do not retry automatically; refresh status to reconcile with the admission service.",
+    title: operation === "history" ? "আবেদনের তালিকা লোড করা যাচ্ছে না" : "অনুরোধের ফল নিশ্চিত করা যায়নি",
+    description: operation === "history" ? "ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।" : "অনুরোধ পাঠানোর পরে সংযোগ বিচ্ছিন্ন হয়েছে, তাই এটি সফল হয়ে থাকতে পারে। স্বয়ংক্রিয়ভাবে আবার চেষ্টা না করে সর্বশেষ অবস্থা দেখুন।",
     isNetworkError: true,
     shouldRefresh: false
   };

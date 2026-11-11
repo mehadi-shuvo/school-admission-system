@@ -9,13 +9,13 @@ async function createClass(request: APIRequestContext) {
 
 test("class discovery remains usable without horizontal overflow at representative viewports", async ({ page, request }) => {
   const className = await createClass(request);
-  for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 }, { width: 1440, height: 900 }]) {
+  for (const viewport of [{ width: 320, height: 640 }, { width: 375, height: 812 }, { width: 768, height: 1024 }, { width: 1024, height: 768 }, { width: 1440, height: 900 }]) {
     await page.setViewportSize(viewport);
     await page.goto("/");
     await expect(page.getByRole("heading", { name: className })).toBeVisible();
-    await expect(page.getByLabel("Search classes")).toBeVisible();
+    await expect(page.getByLabel("Search Classes")).toBeVisible();
     const classCard = page.getByRole("heading", { name: className }).locator("..").locator("..");
-    await expect(classCard.getByRole("button", { name: "Reserve seat" })).toBeVisible();
+    await expect(classCard.getByRole("button", { name: "Apply Now" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   }
 });

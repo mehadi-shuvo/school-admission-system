@@ -28,9 +28,7 @@ export function MyHoldsPage() {
   }, [handoffStudentId, history.load, validStudentId]);
 
   useEffect(() => {
-    if (history.studentId && (!validStudentId || history.studentId !== studentId)) {
-      history.clear();
-    }
+    if (history.studentId && (!validStudentId || history.studentId !== studentId)) history.clear();
   }, [history.clear, history.studentId, studentId, validStudentId]);
 
   function submitLookup(event: React.FormEvent<HTMLFormElement>) {
@@ -46,9 +44,7 @@ export function MyHoldsPage() {
   }
 
   function refreshHistory() {
-    if (history.studentId) {
-      void history.load(history.studentId);
-    }
+    if (history.studentId) void history.load(history.studentId);
   }
 
   async function reconcileElapsedHold(holdId: string) {
@@ -67,24 +63,15 @@ export function MyHoldsPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeading title="My reservations" description="Use the assignment-defined student identifier to view and manage your own admission reservations." />
-      <section aria-labelledby="history-lookup-title" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <h2 className="text-lg font-semibold text-slate-950" id="history-lookup-title">Find reservation history</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">This Student ID is shared with the page header. It is a lookup identifier, not a sign-in method.</p>
-        <form className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-start" noValidate onSubmit={submitLookup}><div className="min-w-0 flex-1"><label className="block text-sm font-semibold text-slate-900" htmlFor="history-student-id">Student ID</label><input aria-describedby="history-student-id-help history-student-id-error" aria-invalid={touched && !validStudentId} autoComplete="off" className="mt-2 block min-h-11 w-full rounded-lg border border-slate-300 px-3 text-slate-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100" id="history-student-id" inputMode="numeric" maxLength={17} onBlur={() => setTouched(true)} onChange={(event) => setStudentId(event.target.value)} pattern="[0-9]{17}" placeholder="17-digit Student ID" type="text" value={studentId} /><p className="mt-2 text-sm text-slate-600" id="history-student-id-help">Leading zeros are preserved.</p><p className="mt-1 min-h-5 text-sm text-red-700" id="history-student-id-error" role={touched && !validStudentId ? "alert" : undefined}>{touched && !validStudentId ? "Enter exactly 17 ASCII digits." : ""}</p></div><Button className="sm:mt-7" disabled={!validStudentId || history.isLoading} type="submit">{history.isLoading ? "Loading history…" : "View reservations"}</Button></form>
-        {history.studentId ? <button className="mt-2 text-sm font-semibold text-blue-800 underline underline-offset-4" onClick={switchStudent} type="button">Use another Student ID</button> : null}
+      <PageHeading title="My Applications" description="আপনার জন্মনিবন্ধন নম্বর দিয়ে ভর্তি আবেদন ও সংরক্ষণের বর্তমান অবস্থা দেখুন।" />
+      <section aria-labelledby="history-lookup-title" className="rounded-2xl border border-[#dce6f2] bg-white p-5 shadow-sm sm:p-6"><h2 className="text-xl font-bold text-[#102a4c]" id="history-lookup-title">Find your applications</h2><p className="mt-1 text-sm leading-6 text-slate-600">এই জন্মনিবন্ধন নম্বরটি পেজের উপরের নম্বরের সঙ্গে একই। এটি লগইন পদ্ধতি নয়, শুধু আবেদন খোঁজার জন্য ব্যবহৃত হয়।</p>
+        <form className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-start" noValidate onSubmit={submitLookup}><div className="min-w-0 flex-1"><label className="block text-sm font-bold text-[#17365d]" htmlFor="history-student-id">Birth Registration Number</label><input aria-describedby="history-student-id-help history-student-id-error" aria-invalid={touched && !validStudentId} autoComplete="off" className="mt-2 block min-h-11 w-full rounded-xl border border-[#cbd8e7] px-3 text-slate-950 outline-none focus:border-[#12345b] focus:ring-2 focus:ring-blue-100" id="history-student-id" inputMode="numeric" maxLength={17} onBlur={() => setTouched(true)} onChange={(event) => setStudentId(event.target.value)} pattern="[0-9]{17}" placeholder="Enter your 17-digit birth registration number" type="text" value={studentId} /><p className="mt-2 text-sm text-slate-600" id="history-student-id-help">শুরুর শূন্য অক্ষুণ্ণ থাকবে।</p><p className="mt-1 min-h-5 text-sm text-red-700" id="history-student-id-error" role={touched && !validStudentId ? "alert" : undefined}>{touched && !validStudentId ? "ঠিক ১৭টি ইংরেজি সংখ্যা লিখুন।" : ""}</p></div><Button className="sm:mt-7" disabled={!validStudentId || history.isLoading} type="submit">{history.isLoading ? "Loading applications..." : "View Applications"}</Button></form>
+        {history.studentId ? <button className="mt-2 text-sm font-bold text-[#12345b] underline underline-offset-4" onClick={switchStudent} type="button">Use another registration number</button> : null}
       </section>
-      <section aria-labelledby="reservation-history-title">
-        <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-semibold text-slate-950" id="reservation-history-title">Reservation history</h2><p className="mt-1 text-sm text-slate-600">The admission service provides the effective reservation status.</p></div>{history.studentId ? <Button onClick={refreshHistory}>Refresh history</Button> : null}</div>
-        <div aria-live="polite" className="mt-5">
-          {history.isLoading ? <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><LoadingState label="Loading reservation history" /></div> : null}
-          {historyError ? <div className="space-y-3"><ErrorState description={historyError.description} title={historyError.title} />{history.studentId ? <Button onClick={refreshHistory}>Retry</Button> : null}</div> : null}
-          {!history.isLoading && !historyError && !history.studentId ? <EmptyState title="Enter a Student ID to view reservations" description="Reservation history is shown only after a valid Student ID lookup." /> : null}
-          {!history.isLoading && !historyError && history.hasLoaded && history.holds.length === 0 ? <EmptyState title="No reservations found" description="There are no active or historical reservations for this Student ID." /> : null}
-          {!history.isLoading && !historyError && history.holds.length > 0 && history.studentId ? <div className="grid gap-5">{history.holds.map((hold) => <HoldCard hold={hold} key={hold.holdId} onElapsed={(holdId) => void reconcileElapsedHold(holdId)} onRefresh={refreshHistory} onStatusReconciled={reconcileLatestReservation} studentId={history.studentId!} />)}</div> : null}
-        </div>
+      <section aria-labelledby="reservation-history-title"><div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-semibold tracking-[0.08em] text-[#237a67]">Application Status</p><h2 className="mt-1 text-2xl font-bold text-[#102a4c]" id="reservation-history-title">My Applications</h2><p className="mt-1 text-sm text-slate-600">ভর্তি সেবা থেকে পাওয়া সর্বশেষ অবস্থা দেখানো হচ্ছে।</p></div>{history.studentId ? <Button onClick={refreshHistory}>Refresh</Button> : null}</div>
+        <div aria-live="polite" className="mt-5">{history.isLoading ? <div className="rounded-2xl border border-[#dce6f2] bg-white p-6 shadow-sm"><LoadingState label="আবেদনের তথ্য লোড হচ্ছে" /></div> : null}{historyError ? <div className="space-y-3"><ErrorState description={historyError.description} title={historyError.title} />{history.studentId ? <Button onClick={refreshHistory}>আবার চেষ্টা করুন</Button> : null}</div> : null}{!history.isLoading && !historyError && !history.studentId ? <EmptyState title="আবেদন দেখতে শিক্ষার্থী আইডি লিখুন" description="সঠিক শিক্ষার্থী আইডি দিয়ে খোঁজার পর আপনার আবেদনগুলো দেখা যাবে।" /> : null}{!history.isLoading && !historyError && history.hasLoaded && history.holds.length === 0 ? <EmptyState title="কোনো আবেদন পাওয়া যায়নি" description="এই শিক্ষার্থী আইডির জন্য কোনো বর্তমান বা পুরোনো আবেদন নেই।" /> : null}{!history.isLoading && !historyError && history.holds.length > 0 && history.studentId ? <div className="grid gap-5">{history.holds.map((hold) => <HoldCard hold={hold} key={hold.holdId} onElapsed={(holdId) => void reconcileElapsedHold(holdId)} onRefresh={refreshHistory} onStatusReconciled={reconcileLatestReservation} studentId={history.studentId!} />)}</div> : null}</div>
       </section>
-      <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-950"><ShieldCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-blue-700" /><p>Your student identifier is used only for the assignment-defined reservation lookup. It is not a sign-in method.</p></div>
+      <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-[#17365d]"><ShieldCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-[#237a67]" /><p>আপনার শিক্ষার্থী আইডি শুধু এই অ্যাসাইনমেন্টের আবেদন খোঁজার জন্য ব্যবহৃত হয়। এটি লগইন পদ্ধতি নয়।</p></div>
     </div>
   );
 }

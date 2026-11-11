@@ -5,7 +5,7 @@ interface ErrorStateProps {
   description: string;
 }
 
-export function ErrorState({ title = "Unable to load this section", description }: ErrorStateProps) {
+export function ErrorState({ title = "এই অংশের তথ্য লোড করা যাচ্ছে না", description }: ErrorStateProps) {
   return (
     <div className="rounded-xl border border-red-200 bg-red-50 p-5" role="alert">
       <div className="flex gap-3">

@@ -10,9 +10,9 @@ describe("HoldCountdown", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
     render(<HoldCountdown expiresAt="2030-01-01T00:01:02Z" />);
-    expect(screen.getByText("01:02 remaining")).toBeInTheDocument();
+    expect(screen.getByText("01:02 বাকি")).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(2000));
-    expect(screen.getByText("01:00 remaining")).toBeInTheDocument();
+    expect(screen.getByText("01:00 বাকি")).toBeInTheDocument();
   });
 
   it("reaches zero once and notifies the caller", () => {
@@ -21,7 +21,7 @@ describe("HoldCountdown", () => {
     const elapsed = vi.fn();
     render(<HoldCountdown expiresAt="2030-01-01T00:00:01Z" onElapsed={elapsed} />);
     act(() => vi.advanceTimersByTime(1000));
-    expect(screen.getByText("Time elapsed")).toBeInTheDocument();
+    expect(screen.getByText("সময় শেষ")).toBeInTheDocument();
     expect(elapsed).toHaveBeenCalledTimes(1);
     act(() => vi.advanceTimersByTime(3000));
     expect(elapsed).toHaveBeenCalledTimes(1);
@@ -31,6 +31,6 @@ describe("HoldCountdown", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
     render(<HoldCountdown expiresAt="2030-01-01T02:03:04Z" />);
-    expect(screen.getByText("2:03:04 remaining")).toBeInTheDocument();
+    expect(screen.getByText("2:03:04 বাকি")).toBeInTheDocument();
   });
 });

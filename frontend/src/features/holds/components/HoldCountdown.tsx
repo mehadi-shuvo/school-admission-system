@@ -11,7 +11,7 @@ function formatRemaining(milliseconds: number): string {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   const minuteSecond = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  return hours > 0 ? `${hours}:${minuteSecond} remaining` : `${minuteSecond} remaining`;
+  return hours > 0 ? `${hours}:${minuteSecond} বাকি` : `${minuteSecond} বাকি`;
 }
 
 interface HoldCountdownProps {
@@ -38,5 +38,5 @@ export function HoldCountdown({ expiresAt, onElapsed }: HoldCountdownProps) {
     }
   }, [onElapsed, remaining]);
 
-  return <time aria-live="polite" dateTime={expiresAt} className="font-semibold text-slate-900">{remaining === 0 ? "Time elapsed" : formatRemaining(remaining)}</time>;
+  return <time aria-live="polite" dateTime={expiresAt} className="font-semibold text-slate-900">{remaining === 0 ? "সময় শেষ" : formatRemaining(remaining)}</time>;
 }
