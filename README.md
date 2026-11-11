@@ -46,6 +46,7 @@ cp .env.example .env
 docker compose up --build -d
 docker compose ps
 curl -i http://localhost:8080/health
+curl -i http://localhost:8080/health/ready
 ```
 
 Local URLs:
@@ -53,6 +54,7 @@ Local URLs:
 - Frontend: `http://localhost:3000`
 - API: `http://localhost:8080`
 - Health: `http://localhost:8080/health`
+- Database readiness: `http://localhost:8080/health/ready`
 
 Stop containers while keeping the database volume:
 
@@ -86,6 +88,19 @@ docker compose logs migrate
 docker compose logs backend
 docker compose config --quiet
 ```
+
+## Operations and API documentation
+
+Every request receives an `X-Correlation-ID` response header. A single incoming value containing only letters, digits, `.`, `_`, or `-` (up to 64 characters) is propagated; missing, malformed, multiple, or oversized values are replaced with a generated identifier. The API writes one structured completion log per request containing the correlation ID, HTTP method, path, status code, and elapsed milliseconds. It never writes Student IDs, request bodies, or connection strings in that request log.
+
+```sh
+curl -i http://localhost:8080/classes -H 'X-Correlation-ID: local-check-01'
+docker compose logs backend
+```
+
+`GET /health` keeps its existing API/database health behavior. `GET /health/ready` performs a lightweight PostgreSQL connectivity check and returns `200` only when the database is reachable; otherwise it returns `503` without database details. Neither endpoint applies migrations.
+
+The existing built-in OpenAPI document is available only in the Development environment at `http://localhost:5227/openapi/v1.json` when running the API locally with `dotnet run --project backend/SchoolAdmission.Api`. It documents the current routes, response schemas, 17-digit `X-Student-Id` requirement, hold expiry, ownership, idempotency, and conflict behavior. The normal Docker Compose stack runs in Production, so it does not expose the OpenAPI document by default. No Swagger UI package is included.
 
 ## Business workflow
 
@@ -144,6 +159,7 @@ Availability counts unexpired `HELD` rows and all `CONFIRMED` rows. A hosted wor
 | `DELETE` | `/holds/{holdId}` | Cancel a hold; requires `X-Student-Id`. |
 | `GET` | `/me/holds` | Get a student's reservation history. |
 | `GET` | `/health` | Check API and database health. |
+| `GET` | `/health/ready` | Check PostgreSQL readiness without running migrations. |
 
 Invalid IDs or Student IDs return `400`; missing resources return `404`; ownership failures return `403`; conflicts such as duplicate active reservations, no seats, or invalid state transitions return `409`.
 
@@ -159,6 +175,14 @@ From the repository root:
 dotnet restore SchoolAdmissionSystem.slnx
 dotnet build SchoolAdmissionSystem.slnx --no-restore
 dotnet test SchoolAdmissionSystem.slnx --no-restore
+```
+
+For the readiness endpoint after starting Compose:
+
+```sh
+curl -i http://localhost:8080/health
+curl -i http://localhost:8080/health/ready
+docker compose logs backend
 ```
 
 From `frontend/`:
