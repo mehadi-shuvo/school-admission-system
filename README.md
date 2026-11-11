@@ -142,15 +142,15 @@ availableSeats = totalSeats - heldSeats - confirmedSeats
 sequenceDiagram
     participant S1 as Student A
     participant S2 as Student B
-    participant API as API process(es)
+    participant API as API
     participant DB as PostgreSQL
-    S1->>API: POST /classes/{id}/holds
-    S2->>API: POST /classes/{id}/holds
-    API->>DB: Begin transaction + lock class row (FOR UPDATE)
-    DB-->>API: Serialized capacity check
-    API->>DB: Create eligible hold; commit
-    API-->>S1: 201 HELD (if seat won)
-    API-->>S2: 409 Conflict (if now full)
+    S1->>API: Create hold request
+    S2->>API: Create hold request
+    API->>DB: Lock class and check capacity
+    DB-->>API: Return seat result
+    API->>DB: Save hold and commit
+    API-->>S1: 201 Created when seat is free
+    API-->>S2: 409 Conflict when class is full
 ```
 
 The diagram illustrates contention for the **last available seat**; which student wins is determined by transaction ordering, not by the diagram's participant order.
