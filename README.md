@@ -1,242 +1,329 @@
-# School Admission System
+# Onnorokom School — Admission System
 
-A full-stack admission-reservation system. Operators create classes; students use a 17-digit Student ID to hold, confirm, cancel, and review reservations. PostgreSQL transactions and row-level locks protect capacity under concurrent requests.
+**A concurrency-safe, first-come-first-served school admission platform.** Built for the OnnoRokom Projukti Limited Assistant Software Engineer take-home assignment.
 
-> The Student ID is an assignment-defined lookup and ownership mechanism, not authentication. Admission-fee payment is simulated; no money is processed.
+> **Reviewer quick start:** From the repository root, run `docker compose up`. Open **http://localhost:3000** for the web app and **http://localhost:8080/health** for the backend. Docker Compose builds and starts the frontend, API, database migration, and PostgreSQL services. No host .NET, Node.js, or PostgreSQL installation is required.
 
-## Features
+## Contents
 
-- Class creation with unique names and positive capacity
-- Temporary holds, hold details, and student reservation history
-- Simulated confirmation, cancellation, automatic expiry, and seat reuse
-- Five-second visible-tab availability refresh
-- PostgreSQL-backed multi-process concurrency protection
+- [Overview](#overview)
+- [Technology stack](#technology-stack)
+- [Run locally with Docker](#run-locally-with-docker)
+- [Architecture](#architecture)
+- [Admission lifecycle](#admission-lifecycle)
+- [Seat safety and concurrency](#seat-safety-and-concurrency)
+- [API reference](#api-reference)
+- [Configuration](#configuration)
+- [Frontend experience](#frontend-experience)
+- [Reliability and observability](#reliability-and-observability)
+- [Testing and bonus requirements](#testing-and-bonus-requirements)
+- [Project layout](#project-layout)
+- [Design decisions and scope](#design-decisions-and-scope)
+- [Assignment compliance](#assignment-compliance)
 
-## Technology and architecture
+## Overview
 
-- ASP.NET Core 10, EF Core 10, PostgreSQL 17
-- React 19, TypeScript, Vite, Tailwind CSS, and Nginx
-- Docker Compose; xUnit/Testcontainers; Vitest/React Testing Library; Playwright Chromium
+The system models a school where places are allocated **first come, first served**—not by lottery. Each class/shift combination is a separately managed class with its own seat capacity (for example, `Class 6 – Morning Shift`). A student identified by a **17-digit birth registration number** may temporarily reserve a seat, simulate paying the admission fee to confirm it, or cancel the application. An expired reservation releases its seat for other applicants.
 
-```text
-Browser → React served by Nginx (:3000) → /api/* → ASP.NET Core (:8080) → PostgreSQL
+### Core capabilities
+
+- Admin creates classes with names and seat capacities.
+- Applicants browse live seat counts: **total**, **held**, **confirmed**, and **available**.
+- Seat holds have configurable expiry and a live countdown.
+- Fee payment is **simulated**, not integrated with a payment gateway.
+- Applicants view, confirm, and cancel their own applications.
+- Expired holds release capacity even when nobody calls an API.
+- PostgreSQL-backed locking prevents overselling under concurrent requests.
+- UI supports Bangla/English guidance, friendly errors, and recovery states.
+
+## Technology stack
+
+| Layer            | Technology                                       | Purpose                                                   |
+| ---------------- | ------------------------------------------------ | --------------------------------------------------------- |
+| Backend          | C#, ASP.NET Core **10**                          | HTTP API, validation, business rules, background services |
+| Persistence      | PostgreSQL **17**, Entity Framework Core, Npgsql | Durable transactional storage                             |
+| Frontend         | React **19**, TypeScript, Vite                   | Responsive single-page application                        |
+| UI               | Tailwind CSS                                     | Styling and responsive layout                             |
+| Reverse proxy    | Nginx                                            | Serves frontend and forwards `/api/*` requests            |
+| Infrastructure   | Docker, Docker Compose                           | Reproducible multi-service startup                        |
+| Backend testing  | xUnit, Testcontainers                            | API, database, and concurrency verification               |
+| Frontend testing | Vitest, React Testing Library, Playwright        | Component and browser-level verification                  |
+
+The assignment requires **.NET 8+, PostgreSQL, React 18+, and Docker**; the selected versions meet those minimums.
+
+## Run locally with Docker
+
+### Prerequisites
+
+- Docker Engine or Docker Desktop with the Compose plugin.
+- Internet access on the first run to download base images and restore dependencies.
+
+### 1. Start the complete system
+
+```bash
+docker compose up
 ```
 
-The `migrate` service applies EF Core migrations after PostgreSQL is healthy. The API starts after migration succeeds. PostgreSQL is private to the Docker network and has no host port mapping.
+Compose builds missing images and starts PostgreSQL, database migration, backend, and frontend. Wait until the migration finishes and the application services are ready.
 
-## Repository layout
+### 2. Open the application
 
-```text
-backend/SchoolAdmission.Api/      API, entities, migrations, services
-frontend/                         React application and browser/unit tests
-tests/SchoolAdmission.Api.Tests/  xUnit and PostgreSQL integration tests
-docker-compose.yml                Normal application stack
-docker-compose.e2e.yml            Isolated browser-test stack
-docker-compose.bonus.yml          Isolated two-backend verifier
-```
+| Service                    | Address                            |
+| -------------------------- | ---------------------------------- |
+| Web application            | http://localhost:3000              |
+| Backend API                | http://localhost:8080              |
+| Backend liveness           | http://localhost:8080/health       |
+| Backend readiness          | http://localhost:8080/health/ready |
+| API through frontend proxy | http://localhost:3000/api/classes  |
 
-## Prerequisites and quick start
+**First-use walkthrough:** Create a class on the **Admin** page → enter a 17-digit birth registration number → browse classes → hold a seat → inspect the countdown → select **Pay Fee** to simulate confirmation, or cancel → inspect **My Applications**.
 
-Install Docker Engine or Docker Desktop with Compose v2. For local test execution, also install .NET SDK 10 and Node.js compatible with the committed lockfile.
+### 3. Stop without deleting data
 
-If `.env` does not already exist, run these commands from the repository root:
-
-```sh
-cp .env.example .env
-docker compose up --build -d
-docker compose ps
-curl -i http://localhost:8080/health
-curl -i http://localhost:8080/health/ready
-```
-
-Local URLs:
-
-- Frontend: `http://localhost:3000`
-- API: `http://localhost:8080`
-- Health: `http://localhost:8080/health`
-- Database readiness: `http://localhost:8080/health/ready`
-
-Stop containers while keeping the database volume:
-
-```sh
+```bash
 docker compose down
 ```
 
-Do not use volume-deletion commands unless intentionally discarding local data.
+The PostgreSQL **named volume** preserves database data across ordinary container restarts and `docker compose down` / `docker compose up`. **Do not use `docker compose down -v`** if you want to retain records.
 
-## Configuration
+### 4. Useful diagnostics
 
-| Setting | Used by | Default / behavior |
-|---|---|---|
-| `POSTGRES_DB` | Normal Compose | `school_admission` |
-| `POSTGRES_USER` | Normal Compose | `school_admission` |
-| `POSTGRES_PASSWORD` | Normal Compose | Local-only fallback; set a private `.env` value for shared use. |
-| `HOLD_DURATION_SECONDS` | API and normal Compose | `600`; positive integer required. |
-| `FRONTEND_PORT` | Normal Compose | `3000`; maps Nginx port 80. |
-| `HOLD_EXPIRY_SCAN_INTERVAL_SECONDS` | API configuration | `30`; positive integer required. Normal Compose does not forward it into the API container. |
-| `VITE_API_BASE_PATH` | Frontend build | `/api` by default. |
-| `VITE_DEV_API_TARGET` | Vite development proxy | `http://localhost:8080` by default. |
-
-`BACKEND_PORT` appears in `.env.example`, but the current normal Compose file publishes fixed host port `8080` and does not consume it. Never commit `.env` files or production credentials.
-
-## Migrations and persistence
-
-The one-shot `migrate` service invokes the API with `--migrate`, which calls EF Core `Database.Migrate()`. The `postgres-data` named volume persists through backend/container restarts and a normal `docker compose down`.
-
-```sh
-docker compose logs migrate
-docker compose logs backend
-docker compose config --quiet
+```bash
+docker compose ps
+docker compose logs -f backend
+docker compose logs -f frontend
+curl -i http://localhost:8080/health/ready
+curl -i http://localhost:3000/api/classes
 ```
 
-## Operations and API documentation
+## Architecture
 
-Every request receives an `X-Correlation-ID` response header. A single incoming value containing only letters, digits, `.`, `_`, or `-` (up to 64 characters) is propagated; missing, malformed, multiple, or oversized values are replaced with a generated identifier. The API writes one structured completion log per request containing the correlation ID, HTTP method, path, status code, and elapsed milliseconds. It never writes Student IDs, request bodies, or connection strings in that request log.
-
-```sh
-curl -i http://localhost:8080/classes -H 'X-Correlation-ID: local-check-01'
-docker compose logs backend
+```mermaid
+flowchart LR
+    B[Browser / React SPA] -->|Same-origin /api/*| N[Nginx frontend]
+    N -->|Proxy, strip /api prefix| A[ASP.NET Core API]
+    A -->|EF Core / Npgsql| P[(PostgreSQL)]
+    W[Hold-expiry background worker] -->|Release expired holds| P
+    A -. Hosts .-> W
+    M[Migration container] -->|Apply migrations before API starts| P
 ```
 
-`GET /health` keeps its existing API/database health behavior. `GET /health/ready` performs a lightweight PostgreSQL connectivity check and returns `200` only when the database is reachable; otherwise it returns `503` without database details. Neither endpoint applies migrations.
+**Request flow:** Browser requests use relative `/api/*` paths. Nginx routes these to the backend; for example, `/api/classes` becomes backend `/classes`. This avoids exposing the internal Docker service name to browser JavaScript.
 
-The existing built-in OpenAPI document is available only in the Development environment at `http://localhost:5227/openapi/v1.json` when running the API locally with `dotnet run --project backend/SchoolAdmission.Api`. It documents the current routes, response schemas, 17-digit `X-Student-Id` requirement, hold expiry, ownership, idempotency, and conflict behavior. The normal Docker Compose stack runs in Production, so it does not expose the OpenAPI document by default. No Swagger UI package is included.
+## Admission lifecycle
 
-## Business workflow
-
-### Class management
-
-The frontend route `/admin/classes` creates classes. Names are trimmed, required, at most 150 characters, and unique; `totalSeats` must be positive.
-
-```sh
-curl -i -X POST http://localhost:8080/classes \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Class 6 - Morning Shift","totalSeats":120}'
-
-curl -i http://localhost:8080/classes
+```mermaid
+stateDiagram-v2
+    [*] --> HELD: Reserve available seat
+    HELD --> CONFIRMED: Simulate fee payment before expiry
+    HELD --> CANCELLED: Applicant cancels
+    HELD --> EXPIRED: Hold deadline passes
+    CONFIRMED --> [*]
+    CANCELLED --> [*]
+    EXPIRED --> [*]
 ```
 
-### Student identity and holds
+- A hold starts in `HELD` and expires after `HOLD_DURATION_SECONDS` (default: **600 seconds**).
+- A successful confirmation transitions to `CONFIRMED`; repeated confirmation is idempotent.
+- Cancellation and expiry release held capacity. Expiration is enforced both when evaluating requests and by a background worker, so it does **not** depend on an incoming API call.
+- A student may have at most one **active or confirmed** application for the same class.
+- A hold may only be confirmed or cancelled by its owning student, subject to the existing API rules.
 
-Supply exactly 17 ASCII digits in `X-Student-Id`; leading zeroes are preserved. Use the same ID for history and ownership-protected actions.
+## Seat safety and concurrency
 
-```sh
-curl -i -X POST http://localhost:8080/classes/CLASS_ID/holds \
-  -H 'X-Student-Id: 12345678901234567'
+The key invariant is:
 
-curl -i http://localhost:8080/holds/HOLD_ID
-
-curl -i http://localhost:8080/me/holds \
-  -H 'X-Student-Id: 12345678901234567'
+```text
+heldSeats + confirmedSeats <= totalSeats
+availableSeats = totalSeats - heldSeats - confirmedSeats
 ```
 
-`CLASS_ID` and `HOLD_ID` are public identifiers returned by the API.
-
-### Simulated confirmation, cancellation, and expiry
-
-Confirmation represents simulated fee payment. Repeating confirmation is idempotent. Cancellation releases a valid hold and is idempotent when repeated. Cancelled and expired holds no longer consume capacity.
-
-```sh
-curl -i -X POST http://localhost:8080/holds/HOLD_ID/confirm \
-  -H 'X-Student-Id: 12345678901234567'
-
-curl -i -X DELETE http://localhost:8080/holds/HOLD_ID \
-  -H 'X-Student-Id: 12345678901234567'
+```mermaid
+sequenceDiagram
+    participant S1 as Student A
+    participant S2 as Student B
+    participant API as API process(es)
+    participant DB as PostgreSQL
+    S1->>API: POST /classes/{id}/holds
+    S2->>API: POST /classes/{id}/holds
+    API->>DB: Begin transaction + lock class row (FOR UPDATE)
+    DB-->>API: Serialized capacity check
+    API->>DB: Create eligible hold; commit
+    API-->>S1: 201 HELD (if seat won)
+    API-->>S2: 409 Conflict (if now full)
 ```
 
-Availability counts unexpired `HELD` rows and all `CONFIRMED` rows. A hosted worker conditionally persists overdue holds as `EXPIRED` at startup and on later scans. Persisted expiry is eventual; logical seat release occurs at the hold expiry timestamp. The class list polls every five seconds while the browser document is visible and refreshes when visibility returns.
+The diagram illustrates contention for the **last available seat**; which student wins is determined by transaction ordering, not by the diagram's participant order.
+
+**Defense in depth:** PostgreSQL transactions and row-level locks serialize capacity-sensitive changes; a database uniqueness constraint protects against duplicate active applications for the same student and class. These protections operate at the shared database level, including when requests reach **different backend processes**.
 
 ## API reference
 
-| Method | Path | Purpose |
-|---|---|---|
-| `POST` | `/classes` | Create a class. |
-| `GET` | `/classes` | List classes with availability. |
-| `GET` | `/classes/{classId}` | Get one class with availability. |
-| `POST` | `/classes/{classId}/holds` | Create a hold; requires `X-Student-Id`. |
-| `GET` | `/holds/{holdId}` | Get a hold's effective status. |
-| `POST` | `/holds/{holdId}/confirm` | Confirm a hold; requires `X-Student-Id`. |
-| `DELETE` | `/holds/{holdId}` | Cancel a hold; requires `X-Student-Id`. |
-| `GET` | `/me/holds` | Get a student's reservation history. |
-| `GET` | `/health` | Check API and database health. |
-| `GET` | `/health/ready` | Check PostgreSQL readiness without running migrations. |
+All student-specific requests use the HTTP header:
 
-Invalid IDs or Student IDs return `400`; missing resources return `404`; ownership failures return `403`; conflicts such as duplicate active reservations, no seats, or invalid state transitions return `409`.
-
-## Concurrency and consistency
-
-Create, confirm, and cancel run in PostgreSQL transactions and lock the class row with `SELECT ... FOR UPDATE`. Capacity counts only unexpired holds and confirmations. A filtered unique index on `(class_id, student_id)` prevents duplicate active `HELD` or `CONFIRMED` reservations. Database coordination, rather than in-memory locking, makes this safe across independent backend processes.
-
-## Tests
-
-From the repository root:
-
-```sh
-dotnet restore SchoolAdmissionSystem.slnx
-dotnet build SchoolAdmissionSystem.slnx --no-restore
-dotnet test SchoolAdmissionSystem.slnx --no-restore
+```http
+X-Student-Id: 12345678901234567
 ```
 
-For the readiness endpoint after starting Compose:
+This is a **17-digit birth registration identifier**, not a login token. Use a test identifier when evaluating the application.
 
-```sh
-curl -i http://localhost:8080/health
-curl -i http://localhost:8080/health/ready
-docker compose logs backend
+| Method   | Endpoint                   | Purpose                             | Expected success |
+| -------- | -------------------------- | ----------------------------------- | ---------------- |
+| `POST`   | `/classes`                 | Create class (admin UI)             | `201`            |
+| `GET`    | `/classes`                 | List classes and seat availability  | `200`            |
+| `GET`    | `/classes/{classId}`       | Get one class and availability      | `200`            |
+| `POST`   | `/classes/{classId}/holds` | Reserve seat for header student     | `201`            |
+| `GET`    | `/holds/{holdId}`          | Read hold status and expiry         | `200`            |
+| `POST`   | `/holds/{holdId}/confirm`  | Simulate fee payment; confirm hold  | `200`            |
+| `DELETE` | `/holds/{holdId}`          | Cancel an eligible hold             | `204`            |
+| `GET`    | `/me/holds`                | List current student's applications | `200`            |
+
+**Key response fields:**
+
+- Class: `id`, `name`, `totalSeats`, `heldSeats`, `confirmedSeats`, `availableSeats`.
+- Created hold: `holdId`, `classId`, `studentId`, `status`, `expiresAt`.
+- Hold detail: `holdId`, `classId`, `status`, `expiresAt`.
+- Confirmation: `holdId`, `status`.
+- My applications: `holdId`, `classId`, `className`, `status`, `expiresAt`.
+
+**Error behavior:** invalid input → `400`; non-owner access → `403`; missing resource → `404`; seat full, duplicate active application, expired hold, or invalid transition → `409`. Unexpected server errors return safe generic responses instead of raw exception details. Existing endpoints retain their assignment-defined contracts.
+
+In development, the backend also exposes an OpenAPI document at `/openapi/v1.json`. This development-only endpoint is intentionally unavailable in the production Docker environment.
+
+## Configuration
+
+Use the repository's `.env.example` as the reference for supported Compose variables. Do not commit real secrets or local `.env` values.
+
+| Setting                                     | Role                             | Notes                                                                  |
+| ------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------- |
+| `FRONTEND_API_UPSTREAM`                     | Nginx backend destination        | Defaults to `backend:8080`; evaluated when frontend container starts   |
+| `HOLD_DURATION_SECONDS`                     | Seat-hold lifetime               | Defaults to `600` seconds                                              |
+| PostgreSQL credentials / database variables | Database configuration           | Passed through Compose to PostgreSQL and the backend connection string |
+| `ConnectionStrings__AdmissionDb`            | ASP.NET Core database connection | Standard environment-based configuration override                      |
+| `VITE_API_BASE_PATH`                        | Frontend API base path           | Vite/build-time setting; browser normally uses relative `/api`         |
+| `VITE_DEV_API_TARGET`                       | Local Vite development proxy     | Development-only target                                                |
+
+### Runtime-configurable backend upstream
+
+The Docker frontend uses the official Nginx image's environment-template mechanism. Its configuration template is rendered at **container startup** rather than hardcoding the upstream into the frontend image.
+
+```bash
+# Example: override the Docker-network-reachable backend target
+FRONTEND_API_UPSTREAM=backend:8080 docker compose up
 ```
 
-From `frontend/`:
+Changing `FRONTEND_API_UPSTREAM` does **not** require rebuilding frontend static assets. The target must be resolvable **from inside the frontend container**; `localhost` there means the frontend container itself, not your host machine.
 
-```sh
+**Note:** `VITE_*` values embedded into a production frontend build are build-time settings. Runtime upstream switching is provided by the Nginx template, not by changing compiled JavaScript.
+
+## Frontend experience
+
+The application provides the four required workflows:
+
+1. **Admin class management** — create a class and specify its total seats.
+2. **Class discovery** — browse classes, inspect total/held/confirmed/available seats, and apply.
+3. **Application detail** — see hold status, live countdown, simulated fee confirmation, and cancellation.
+4. **My Applications** — review applications associated with the supplied student identifier.
+
+Additional usability features include:
+
+- Class seat counts refresh approximately **every five seconds** without a page reload.
+- Expired holds update in the UI and no longer offer a valid Pay action.
+- Student identification is retained across browser refresh/reopen using the existing frontend persistence mechanism.
+- Friendly messages cover invalid input, full classes, expired holds, and backend/network failures.
+- A React application error boundary provides a bilingual fallback and a Reload action for unexpected rendering failures.
+- The admin page includes backend/database readiness information.
+
+## Reliability and observability
+
+| Concern             | Implementation                                                             |
+| ------------------- | -------------------------------------------------------------------------- |
+| Capacity integrity  | PostgreSQL transactions, class-row locking, uniqueness constraints         |
+| Hold expiry         | Logical expiry checks and periodic background cleanup                      |
+| Persistence         | PostgreSQL named Docker volume and EF Core migrations                      |
+| Repeat confirmation | Idempotent confirmation semantics                                          |
+| Request tracing     | `X-Correlation-ID` header, safe structured request logs                    |
+| Error responses     | ASP.NET Core Problem Details / exception handling                          |
+| Error recovery      | Typed frontend API errors, optional request timeouts, React error boundary |
+| Health              | `/health` liveness and `/health/ready` PostgreSQL readiness                |
+
+**Important:** A timed-out or disconnected **mutation** can have an uncertain outcome. The frontend does not automatically retry non-idempotent admission actions; users should check their application state before submitting again.
+
+## Testing and bonus requirements
+
+The repository includes automated verification at multiple layers. Use the commands below as the source of truth rather than relying on a historical test count.
+
+### Backend
+
+```bash
+dotnet test tests/SchoolAdmission.Api.Tests/SchoolAdmission.Api.Tests.csproj
+```
+
+The backend suite covers validation, error contracts, ownership, seat limits, expiry, idempotency, and concurrency. PostgreSQL integration tests use the existing Testcontainers-based setup and may require a running Docker daemon.
+
+### Frontend
+
+```bash
+cd frontend
 npm ci
 npm run lint
 npm run typecheck
-npm run test -- --run
+npm test -- --run
 npm run build
 ```
 
-Run isolated Playwright tests from `frontend/`:
+For browser tests, use the **Playwright commands and setup documented in the frontend package scripts / existing test configuration**. Browser binaries may need to be installed when running tests outside Docker.
 
-```sh
-npm run e2e:up
-npm run test:e2e
+### Bonus 1 — Multi-process concurrency
+
+The implementation includes verification of simultaneous seat requests against **two separate backend processes sharing one PostgreSQL database**. The capacity invariant is enforced by the database, not by an in-process lock. See `ASSUMPTIONS.md` and the repository's concurrency test setup for the exact procedure and environment-gated test commands.
+
+### Bonus 2 — Automated frontend tests
+
+Vitest/React Testing Library and Playwright tests cover frontend behavior and key admission flows. The latest reported local verification included **116 passing backend tests**, **56 passing frontend tests**, and additional browser/concurrency verification; some bonus backend tests are **environment-gated** and can appear as skipped in the standard suite. Re-run the commands before submission and report actual results accurately.
+
+## Project layout
+
+```text
+.
+├── backend/
+│   └── SchoolAdmission.Api/     # ASP.NET Core API, EF Core, background worker
+├── frontend/
+│   ├── src/                    # React pages, features, shared API client
+│   ├── Dockerfile              # Frontend image
+│   └── nginx.conf.template     # Runtime-configurable /api reverse proxy
+├── tests/
+│   └── SchoolAdmission.Api.Tests/  # Backend automated tests
+├── docker-compose.yml          # Full application orchestration
+├── .env.example                # Environment configuration reference
+├── ASSUMPTIONS.md              # Explicit assumptions and rationale
+├── AI_USAGE.md                 # AI assistance disclosure
+└── README.md
 ```
 
-Stop the E2E stack without deleting its volume from the repository root:
+## Design decisions and scope
 
-```sh
-docker compose -p school-admission-e2e -f docker-compose.e2e.yml down
-```
+- **First come, first served:** no lottery or ranking; capacity is allocated transactionally.
+- **Class/shift separation:** each shift is represented as its own class entry, matching the assignment's seat model.
+- **No login:** `X-Student-Id` is deliberately a lightweight assignment identifier, **not production-grade authentication**. Do not use real student records in a public demo.
+- **Simulated payment:** clicking Pay Fee exercises the confirmation transition; no money is collected.
+- **PostgreSQL as source of truth:** seat safety is shared across backend instances, rather than relying on frontend state or a single-process mutex.
+- **No unnecessary infrastructure:** no external queue, cache, or payment gateway is required for the specified scope.
 
-Run the two-backend verifier from the repository root:
+For decisions where the brief leaves room for interpretation—including duplicate class names, cancellation rules, and expiry semantics—see **[ASSUMPTIONS.md](ASSUMPTIONS.md)** for the implemented behavior and reasoning. For disclosure of development assistance, see **[AI_USAGE.md](AI_USAGE.md)**.
 
-```sh
-docker compose -p school-admission-bonus -f docker-compose.bonus.yml up --build --abort-on-container-exit --exit-code-from bonus-verifier bonus-verifier
-```
+## Assignment compliance
 
-Stop its containers while retaining the disposable volume:
+| Assignment area                               | Where to review                                                                                                 |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Section 1.2 technology and Docker             | [Technology stack](#technology-stack), [Run locally](#run-locally-with-docker), [Configuration](#configuration) |
+| All eight mandatory API routes                | [API reference](#api-reference)                                                                                 |
+| Seat hold, confirmation, cancellation, expiry | [Admission lifecycle](#admission-lifecycle)                                                                     |
+| Concurrent requests without overselling       | [Seat safety and concurrency](#seat-safety-and-concurrency)                                                     |
+| Required UI workflows                         | [Frontend experience](#frontend-experience)                                                                     |
+| Background expiry and persistence             | [Reliability and observability](#reliability-and-observability)                                                 |
+| Bonus: multi-process concurrency              | [Testing and bonus requirements](#testing-and-bonus-requirements)                                               |
+| Bonus: frontend automation                    | [Testing and bonus requirements](#testing-and-bonus-requirements)                                               |
+| Assumptions and AI disclosure                 | [ASSUMPTIONS.md](ASSUMPTIONS.md), [AI_USAGE.md](AI_USAGE.md)                                                    |
 
-```sh
-docker compose -p school-admission-bonus -f docker-compose.bonus.yml down
-```
-
-### Verified results
-
-The latest regression audit recorded 103 standard backend tests passed, with 5 Compose-environment-gated bonus tests skipped in that host suite; 39 frontend tests passed; 10 Playwright tests passed; and the 5 multi-process tests passed in each of 3 independent cycles. Docker builds, Compose validation, migration checks, and health checks also passed.
-
-## Security, limitations, and troubleshooting
-
-- PostgreSQL is private to the normal Compose network; only frontend and backend host ports are published.
-- Interpolated EF Core raw-SQL APIs and database constraints complement service validation.
-- There is no real authentication, role management, payment gateway, receipt/refund flow, email/SMS workflow, verified live deployment URL, or real-world identity proof.
-- The normal Compose fallback password is appropriate only for isolated local development.
-
-```sh
-docker compose ps
-docker compose logs db
-docker compose logs migrate
-docker compose logs backend
-curl -i http://localhost:8080/health
-```
-
-If port 8080 or 3000 is occupied, free it before starting the normal stack. For migration failures, inspect `migrate` logs first; do not delete the database volume as a first response.
+---

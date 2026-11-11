@@ -1,60 +1,36 @@
-# Assumptions and Implemented Rules
+# Assumptions
 
-This document distinguishes verified implementation behavior from assignment-level scope assumptions.
+## Purpose
 
-## Verified domain rules
+This file explains choices made where the assignment does not give an exact rule. Required assignment rules are already implemented; they are not optional.
 
-### Classes and seat accounting
+## Main decisions
 
-- A class name is trimmed, required, at most 150 characters, and unique. The database unique index is case-sensitive.
-- `totalSeats` must be positive.
-- `availableSeats = totalSeats - heldSeats - confirmedSeats`.
-- `heldSeats` counts only `HELD` reservations whose `expiresAt` is later than the current UTC time. `confirmedSeats` counts all `CONFIRMED` reservations.
-
-### Reservation states
-
-| State | Meaning | Outcome |
+| ID | Decision | Why / system result |
 |---|---|---|
-| `HELD` | Temporary reservation before expiry | May be confirmed, cancelled, or expired. |
-| `CONFIRMED` | Finalized simulated admission | Terminal; repeated confirmation succeeds idempotently. |
-| `CANCELLED` | Student released a valid hold | Terminal; repeated cancellation succeeds idempotently. |
-| `EXPIRED` | Hold reached its expiry time | Terminal; cannot be confirmed or cancelled. |
+| A01 | A class and its shift are one class record. Class names are required, trimmed, and unique. | The assignment says every shift is a separate class but gives no fixed naming format. Unique names avoid confusion. Names are case-sensitive. |
+| A02 | The 17-digit Student ID identifies the student and hold owner. It is not real login or identity proof. | The assignment has no login system. Leading zeroes are kept. Anyone with a valid ID can use it, so this is not suitable for a real school system. |
+| A03 | One student can have only one `HELD` or `CONFIRMED` reservation in the same class. After cancellation or expiry, they may apply again if a seat is free. | This stops duplicate active applications while allowing released seats to be used again. Duplicate active requests return `409 Conflict`. |
+| A04 | A hold expires when `expiresAt <= now`. An expired hold no longer uses a seat. | The assignment does not define the exact time boundary. This rule gives one clear answer at the expiry time and makes the seat reusable immediately. |
+| A05 | The system has both logical and saved expiry. | Seat counts ignore an overdue hold immediately. A background worker later saves its status as `EXPIRED`, so seat release does not wait for the worker. |
+| A06 | Only the hold owner can confirm or cancel an active hold. Confirmation and repeated cancellation are safe to repeat. | Confirmation means simulated fee payment only. Repeated confirmation stays `CONFIRMED`; repeated cancellation stays successful. Expired, cancelled, or confirmed holds cannot use invalid actions. |
+| A07 | First-come-first-served means the request that gets the database lock while a seat is free succeeds. | Exact internet arrival order cannot be guaranteed. PostgreSQL transactions and row locks prevent overbooking, including with more than one backend process. |
+| A08 | Hold time is configurable with `HOLD_DURATION_SECONDS` (default: 600 seconds). The worker scan interval is configurable separately (default: 30 seconds). | The assignment sets the hold default but not the worker timing. Both values must be positive numbers. |
+| A09 | The frontend refreshes available seats every five seconds while the tab is visible. | The assignment requires updates without reloading the page but does not specify how often. Requests do not overlap, and the backend still makes the final seat decision. |
+| A10 | PostgreSQL stays private in Docker. The browser uses `/api`; Nginx forwards it to `FRONTEND_API_UPSTREAM` (default: `backend:8080`). | This keeps database access off the host and lets the frontend backend target be changed without exposing it to browser code. |
 
-Attempts to apply an unsupported state transition return the API's conflict response.
+## Operational behaviour
 
-### Hold duration and expiry
+- The migration service runs after PostgreSQL is healthy.
+- The PostgreSQL named volume keeps data after a normal container restart or `docker compose down`.
+- Errors follow the API contract: invalid input `400`, wrong owner `403`, missing item `404`, and seat/state conflict `409`.
 
-- `HOLD_DURATION_SECONDS` is a positive-integer TTL; the application default is 600 seconds.
-- `HOLD_EXPIRY_SCAN_INTERVAL_SECONDS` is a positive-integer worker interval; the application default is 30 seconds.
-- Logical expiry occurs exactly at `expiresAt`: expired `HELD` rows are excluded from occupancy immediately.
-- Persisted expiry is eventual: the worker updates overdue `HELD` rows to `EXPIRED` at startup and on subsequent scans. Capacity-changing requests also expire overdue holds for their class while holding that class row.
-- The normal Compose file forwards `HOLD_DURATION_SECONDS`, but not the worker scan interval, so the application default applies there.
+## Optional verification
 
-### Student identity and duplicates
+The repository includes frontend unit tests, Playwright browser tests, and an optional two-backend Docker test. The bonus test checks that two API processes sharing one database cannot overbook seats.
 
-- Student IDs must be exactly 17 ASCII digits, with leading zeroes preserved.
-- The supplied `X-Student-Id` header identifies the owner for assignment purposes. A different supplied ID cannot confirm or cancel an existing hold.
-- A student may have at most one active (`HELD` or `CONFIRMED`) reservation for a class. After expiry or cancellation, a later hold is allowed when capacity exists.
-- This is intentionally not real authentication or identity verification.
+## Limits
 
-### Concurrency and idempotency
-
-- Create, confirm, and cancel use database transactions and lock the relevant class row with PostgreSQL `FOR UPDATE`.
-- A filtered unique index on active statuses protects against duplicate student/class reservations.
-- PostgreSQL, not process-local memory, coordinates capacity across independent backend instances.
-- Background expiry conditionally updates only overdue `HELD` records. Multiple worker instances do not transition confirmed or cancelled records.
-
-## Verified UI behavior
-
-- The class list polls every five seconds while the browser tab is visible and refreshes after visibility returns.
-- The Student ID is held in application memory for the current frontend session; it is not a sign-in flow.
-- The payment button is a simulated admission-fee action that triggers reservation confirmation only.
-- Reservation history supports lookup, loading, empty, error, retry, confirmation, cancellation, and changing the Student ID.
-
-## Assignment scope exclusions
-
-- Class creation is exposed without administrator authentication or role authorization.
-- No payment processor, financial transaction, receipt, refund, email, or SMS workflow exists.
-- No identity-provider integration exists; the Student ID is a lightweight assignment mechanism.
-- No public deployment URL is assumed.
-- PostgreSQL is private in the normal Compose network; production infrastructure and secret-management policy are outside this repository.
+- There is no real login, admin authorization, or identity verification.
+- Payment is simulated; there is no payment gateway, receipt, refund, email, or SMS.
+- This is an assignment project, not a full production admissions platform.
