@@ -4,6 +4,7 @@ import { EmptyState } from "../../components/feedback/EmptyState";
 import { ErrorState } from "../../components/feedback/ErrorState";
 import { LoadingState } from "../../components/feedback/LoadingState";
 import { Button } from "../../components/ui/Button";
+import { ApiError } from "../../lib/api/client";
 import type { AdmissionClass, HoldCreated } from "../../types/api";
 import { ReservationSuccessPanel } from "../holds/components/ReservationSuccessPanel";
 import { useReservation } from "../holds/context/ReservationContext";
@@ -81,7 +82,7 @@ export function DashboardPage() {
           </div>
           <div aria-live="polite" className="mt-6">
             {isLoading ? <div className="rounded-2xl border border-[#dce6f2] bg-white p-8 shadow-sm"><LoadingState label="শ্রেণির তথ্য লোড হচ্ছে" /></div> : null}
-            {isInitialError ? <div className="space-y-3"><ErrorState description={displayError!.description} title={displayError!.title} /><Button onClick={() => void refresh()}>আবার চেষ্টা করুন</Button></div> : null}
+            {isInitialError ? <div className="space-y-3"><ErrorState correlationId={error instanceof ApiError ? error.correlationId : undefined} description={displayError!.description} title={displayError!.title} /><Button onClick={() => void refresh()}>আবার চেষ্টা করুন</Button></div> : null}
             {displayError && !isInitialError ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="status"><span>শেষ পাওয়া আসনের তথ্য দেখানো হচ্ছে। হালনাগাদ করা যায়নি।</span><button className="font-semibold text-[#12345b] underline underline-offset-4" onClick={() => void refresh()} type="button">আবার চেষ্টা করুন</button></div> : null}
             {!isLoading && !isInitialError && classes.length === 0 ? <EmptyState title="এখনও কোনো শ্রেণি পাওয়া যায়নি" description="ভর্তি সেবা থেকে এখনো কোনো শ্রেণির তথ্য আসেনি। পরে আবার দেখুন।" /> : null}
             {!isLoading && !isInitialError && classes.length > 0 && filteredClasses.length === 0 ? <EmptyState title="আপনার খোঁজের সঙ্গে কোনো শ্রেণি মেলেনি" description={hasActiveFilter ? "অনুসন্ধান বা আসনের ফিল্টার পরিবর্তন করুন।" : "কোনো মিল পাওয়া যায়নি।"} /> : null}

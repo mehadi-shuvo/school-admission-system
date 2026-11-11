@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { ErrorState } from "../../../components/feedback/ErrorState";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { Button } from "../../../components/ui/Button";
+import { ApiError } from "../../../lib/api/client";
 import type { AdmissionClass, HoldCreated } from "../../../types/api";
 import { HoldForm } from "../../holds/components/HoldForm";
 import { AvailabilityBadge } from "./AvailabilityBadge";
@@ -38,7 +39,7 @@ export function ClassDetailsPanel({ fallbackClass, admissionClass, isLoading, er
       {isLoading ? <div className="mt-5"><LoadingState label="শ্রেণির তথ্য হালনাগাদ হচ্ছে" /></div> : null}
       {displayError ? (
         <div className="mt-5 space-y-3">
-          <ErrorState description={displayError.description} title={displayError.title} />
+          <ErrorState correlationId={error instanceof ApiError ? error.correlationId : undefined} description={displayError.description} title={displayError.title} />
           <Button onClick={onRefresh}>আবার চেষ্টা করুন</Button>
         </div>
       ) : null}

@@ -9,36 +9,40 @@ export interface ProblemDetails {
 export class ApiError extends Error {
   public readonly status: number;
   public readonly problem?: ProblemDetails;
+  public readonly correlationId?: string;
 
-  public constructor(message: string, status: number, problem?: ProblemDetails) {
+  public constructor(message: string, status: number, problem?: ProblemDetails, correlationId?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.problem = problem;
+    this.correlationId = correlationId;
   }
 }
 
 export interface ApiRequestOptions extends Omit<RequestInit, "body" | "headers"> {
   body?: unknown;
   headers?: HeadersInit;
+  responseType?: "json" | "text";
 }
 
 export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {}
 ): Promise<T> {
-  const headers = new Headers(options.headers);
+  const { body: requestBody, headers: requestHeaders, responseType, ...requestOptions } = options;
+  const headers = new Headers(requestHeaders);
   headers.set("Accept", "application/json");
 
   let body: BodyInit | undefined;
-  if (options.body !== undefined) {
+  if (requestBody !== undefined) {
     headers.set("Content-Type", "application/json");
-    body = JSON.stringify(options.body);
+    body = JSON.stringify(requestBody);
   }
 
   try {
     const response = await fetch(`${apiBasePath}${path}`, {
-      ...options,
+        ...requestOptions,
       headers,
       body
     });
@@ -48,12 +52,17 @@ export async function apiRequest<T>(
       throw new ApiError(
         problem?.detail ?? problem?.title ?? "The request could not be completed.",
         response.status,
-        problem
+        problem,
+        response.headers.get("X-Correlation-ID") ?? undefined
       );
     }
 
     if (response.status === 204) {
       return undefined as T;
+    }
+
+    if (responseType === "text") {
+      return (await response.text()) as T;
     }
 
     return (await response.json()) as T;

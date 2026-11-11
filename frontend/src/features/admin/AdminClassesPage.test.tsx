@@ -6,16 +6,20 @@ import { ApiError } from "../../lib/api/client";
 import { admissionApi } from "../../lib/api/admissionApi";
 import { AdminClassesPage } from "./AdminClassesPage";
 
-vi.mock("../../lib/api/admissionApi", () => ({ admissionApi: { createClass: vi.fn() } }));
+vi.mock("../../lib/api/admissionApi", () => ({ admissionApi: { createClass: vi.fn(), getReadiness: vi.fn() } }));
 
 const createClass = vi.mocked(admissionApi.createClass);
+const getReadiness = vi.mocked(admissionApi.getReadiness);
 
 function renderPage() {
   return render(<MemoryRouter><AdminClassesPage /></MemoryRouter>);
 }
 
 describe("admin class creation", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getReadiness.mockResolvedValue("Healthy");
+  });
 
   it("renders and validates the required class name and whole-number seats", async () => {
     const user = userEvent.setup();
@@ -54,5 +58,17 @@ describe("admin class creation", () => {
     rejectRequest(new ApiError("offline", 0));
     expect(await screen.findByRole("alert")).toHaveTextContent("শ্রেণিটি তৈরি হয়েছে কি না তালিকায় দেখে নিন");
     expect(createClass).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the backend reference ID with the existing creation error message", async () => {
+    const user = userEvent.setup();
+    createClass.mockRejectedValue(new ApiError("duplicate", 409, undefined, "admin-error-9"));
+    renderPage();
+    await user.type(screen.getByLabelText("Class Name"), "Class 6");
+    await user.type(screen.getByLabelText("Total Seats"), "30");
+    await user.click(screen.getByRole("button", { name: "Save Class" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("এই নামে একটি শ্রেণি ইতোমধ্যে থাকতে পারে");
+    expect(screen.getByText("admin-error-9")).toBeInTheDocument();
   });
 });

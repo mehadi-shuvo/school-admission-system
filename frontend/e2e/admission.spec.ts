@@ -49,6 +49,13 @@ test("school admin creates a class and it appears in discovery", async ({ page }
   await expect(page.getByRole("heading", { name })).toBeVisible();
 });
 
+test("admin system health uses the same-origin readiness proxy", async ({ page }) => {
+  await page.goto("/admin/classes");
+  await expect(page.getByRole("heading", { name: "System Health" })).toBeVisible();
+  await expect(page.getByText("Online", { exact: true })).toBeVisible();
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible();
+});
+
 test("class availability refreshes without reloading the page", async ({ page, request }) => {
   const admissionClass = await createClass(request, 2);
   await page.goto("/");

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "../../../components/ui/Button";
+import { CorrelationReference } from "../../../components/feedback/CorrelationReference";
 import { ApiError } from "../../../lib/api/client";
 import { isValidStudentId } from "../../../lib/utils/studentId";
 import type { AdmissionClass, HoldCreated } from "../../../types/api";
@@ -55,6 +56,7 @@ export function HoldForm({ admissionClass, onHoldCreated, onRefreshAvailability 
         <div className="rounded-xl border border-red-200 bg-red-50 p-4" role="alert">
           <p className="font-semibold text-red-950">{displayError.title}</p>
           <p className="mt-1 text-sm leading-6 text-red-800">{displayError.description}</p>
+          <CorrelationReference correlationId={submissionError instanceof ApiError ? submissionError.correlationId : undefined} />
           {(displayError.isConflict || displayError.isNetworkError) ? <button className="mt-3 text-sm font-semibold text-[#12345b] underline underline-offset-4" onClick={onRefreshAvailability} type="button">আসনের তথ্য হালনাগাদ করুন</button> : null}
         </div>
       ) : null}

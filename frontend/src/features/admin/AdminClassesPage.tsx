@@ -1,11 +1,13 @@
 import { CheckCircle2, Info } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { CorrelationReference } from "../../components/feedback/CorrelationReference";
 import { Button } from "../../components/ui/Button";
 import { PageHeading } from "../../components/ui/PageHeading";
 import { admissionApi } from "../../lib/api/admissionApi";
 import { ApiError } from "../../lib/api/client";
 import type { ClassCreated } from "../../types/api";
+import { SystemHealthSection } from "./components/SystemHealthSection";
 
 interface FormErrors {
   name?: string;
@@ -68,10 +70,11 @@ export function AdminClassesPage() {
         <form className="mt-7 space-y-5" noValidate onSubmit={(event) => void submit(event)}>
           <div><label className="block text-sm font-bold text-[#17365d]" htmlFor="class-name">Class Name</label><input aria-describedby="class-name-error" aria-invalid={touched.name && Boolean(errors.name)} className="mt-2 block min-h-11 w-full rounded-xl border border-[#cbd8e7] px-3 text-slate-950 outline-none focus:border-[#12345b] focus:ring-2 focus:ring-blue-100" id="class-name" maxLength={150} onBlur={() => setTouched((current) => ({ ...current, name: true }))} onChange={(event) => setName(event.target.value)} value={name} /><p className="mt-2 min-h-5 text-sm text-red-700" id="class-name-error" role={touched.name && errors.name ? "alert" : undefined}>{touched.name ? errors.name : ""}</p></div>
           <div><label className="block text-sm font-bold text-[#17365d]" htmlFor="total-seats">Total Seats</label><input aria-describedby="total-seats-error total-seats-help" aria-invalid={touched.totalSeats && Boolean(errors.totalSeats)} className="mt-2 block min-h-11 w-full rounded-xl border border-[#cbd8e7] px-3 text-slate-950 outline-none focus:border-[#12345b] focus:ring-2 focus:ring-blue-100" id="total-seats" inputMode="numeric" onBlur={() => setTouched((current) => ({ ...current, totalSeats: true }))} onChange={(event) => setTotalSeats(event.target.value)} placeholder="e.g. 120" type="text" value={totalSeats} /><p className="mt-2 text-sm text-slate-600" id="total-seats-help">অন্তত একটি আসন রাখতে হবে।</p><p className="mt-1 min-h-5 text-sm text-red-700" id="total-seats-error" role={touched.totalSeats && errors.totalSeats ? "alert" : undefined}>{touched.totalSeats ? errors.totalSeats : ""}</p></div>
-          {requestError ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-900" role="alert">{describeError(requestError)}</div> : null}
+          {requestError ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-900" role="alert"><p>{describeError(requestError)}</p><CorrelationReference correlationId={requestError instanceof ApiError ? requestError.correlationId : undefined} /></div> : null}
           <Button disabled={isSubmitting} type="submit">{isSubmitting ? "Saving Class..." : "Save Class"}</Button>
         </form>
       </section>
+      <SystemHealthSection />
     </div>
   );
 }
