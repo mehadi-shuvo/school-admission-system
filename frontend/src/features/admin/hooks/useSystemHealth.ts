@@ -31,12 +31,11 @@ export function useSystemHealth() {
     if (activeRequest.current) return;
 
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     activeRequest.current = controller;
     setState((current) => ({ ...current, isLoading: true, error: null }));
 
     try {
-      await admissionApi.getReadiness(controller.signal);
+      await admissionApi.getReadiness(controller.signal, REQUEST_TIMEOUT_MS);
       if (!isMounted.current) return;
       setState({
         apiStatus: "online",
@@ -77,7 +76,6 @@ export function useSystemHealth() {
         });
       }
     } finally {
-      window.clearTimeout(timeout);
       if (activeRequest.current === controller) activeRequest.current = null;
     }
   }, []);

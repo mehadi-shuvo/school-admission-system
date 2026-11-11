@@ -41,6 +41,6 @@ export const admissionApi = {
       headers: { "X-Student-Id": studentId },
       signal
     }),
-  getReadiness: (signal?: AbortSignal) =>
-    apiRequest<string>("/health/ready", { signal, responseType: "text" })
+  getReadiness: (signal?: AbortSignal, timeoutMs?: number) =>
+    apiRequest<string>("/health/ready", { signal, responseType: "text", timeoutMs })
 };

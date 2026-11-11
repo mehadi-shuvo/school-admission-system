@@ -24,13 +24,25 @@ export interface ApiRequestOptions extends Omit<RequestInit, "body" | "headers">
   body?: unknown;
   headers?: HeadersInit;
   responseType?: "json" | "text";
+  timeoutMs?: number;
 }
 
 export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {}
 ): Promise<T> {
-  const { body: requestBody, headers: requestHeaders, responseType, ...requestOptions } = options;
+  const {
+    body: requestBody,
+    headers: requestHeaders,
+    responseType,
+    timeoutMs,
+    signal: callerSignal,
+    ...requestOptions
+  } = options;
+  if (timeoutMs !== undefined && (!Number.isFinite(timeoutMs) || timeoutMs <= 0)) {
+    throw new TypeError("timeoutMs must be a positive finite number.");
+  }
+
   const headers = new Headers(requestHeaders);
   headers.set("Accept", "application/json");
 
@@ -40,11 +52,32 @@ export async function apiRequest<T>(
     body = JSON.stringify(requestBody);
   }
 
+  const timeoutController = timeoutMs === undefined ? null : new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  const abortForCaller = () => timeoutController?.abort();
+
+  if (timeoutController && callerSignal) {
+    if (callerSignal.aborted) {
+      timeoutController.abort();
+    } else {
+      callerSignal.addEventListener("abort", abortForCaller, { once: true });
+    }
+  }
+
+  if (timeoutController) {
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      timeoutController.abort();
+    }, timeoutMs);
+  }
+
   try {
     const response = await fetch(`${apiBasePath}${path}`, {
-        ...requestOptions,
+      ...requestOptions,
       headers,
-      body
+      body,
+      signal: timeoutController?.signal ?? callerSignal
     });
 
     if (!response.ok) {
@@ -67,11 +100,22 @@ export async function apiRequest<T>(
 
     return (await response.json()) as T;
   } catch (error) {
-    if (error instanceof ApiError || isAbortError(error)) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    if (isAbortError(error)) {
+      if (timedOut) {
+        throw new ApiError("The request timed out.", 0);
+      }
+
       throw error;
     }
 
     throw new ApiError("Unable to reach the admission service.", 0);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+    callerSignal?.removeEventListener("abort", abortForCaller);
   }
 }
 

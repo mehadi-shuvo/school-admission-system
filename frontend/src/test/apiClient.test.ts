@@ -4,6 +4,7 @@ import { apiRequest } from "../lib/api/client";
 describe("apiRequest", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("supports HTTP 204 responses", async () => {
@@ -42,4 +43,42 @@ describe("apiRequest", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Network unavailable")));
     await expect(apiRequest("/classes")).rejects.toMatchObject({ status: 0, message: "Unable to reach the admission service." });
   });
+
+  it("returns a status-zero API error when an explicitly configured timeout elapses", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((_, init?: RequestInit) => pendingUntilAbort(init?.signal)));
+
+    const request = apiRequest("/classes", { timeoutMs: 500 });
+    const expectation = expect(request).rejects.toMatchObject({ status: 0, message: "The request timed out." });
+    await vi.advanceTimersByTimeAsync(500);
+
+    await expectation;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("preserves a caller cancellation when a timeout is configured", async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((_, init?: RequestInit) => pendingUntilAbort(init?.signal)));
+
+    const request = apiRequest("/classes", { signal: controller.signal, timeoutMs: 500 });
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("cleans up an explicit timeout after a successful response", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 })));
+
+    await expect(apiRequest<unknown[]>("/classes", { timeoutMs: 500 })).resolves.toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });
+
+function pendingUntilAbort(signal: AbortSignal | null | undefined): Promise<Response> {
+  return new Promise((_, reject) => {
+    signal?.addEventListener("abort", () => reject(new DOMException("Request aborted", "AbortError")), { once: true });
+  });
+}
