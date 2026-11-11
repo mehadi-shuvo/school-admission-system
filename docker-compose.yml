@@ -57,6 +57,8 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+    environment:
+      FRONTEND_API_UPSTREAM: ${FRONTEND_API_UPSTREAM:-backend:8080}
     depends_on:
       backend:
         condition: service_started
